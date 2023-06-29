@@ -17,6 +17,7 @@
 #pragma once
 
 #include "ContiguousTensor.h"
+#include "Tensor.h"
 #include <memory>
 #include <ostream>
 #include <cstddef>
@@ -51,8 +52,8 @@ class ChunkedTensor : public Tensor {
                            const std::vector<size_t> &chunk_shape,
                            InitCode init_code)
       : Tensor<ValueType>(tensor_shape), chunk_shape(chunk_shape) {
-    dim_strides.resize(rank);
     chunk_strides.resize(rank);
+    intra_chunk_strides.resize(rank);
 
     if (rank > 0) {
       intra_chunk_strides[0] = 1;
@@ -67,6 +68,7 @@ class ChunkedTensor : public Tensor {
     }
 
     total_chunk_count = 0;
+    chunks_per_dim.resize(rank);
     for (size_t i = 0; i < rank; i++) {
       chunks_per_dim[i] = tensor_shape[i] % chunk_shape[i] == 0
                               ? tensor_shape[i] / chunk_shape[i]
@@ -81,34 +83,49 @@ class ChunkedTensor : public Tensor {
 
     data = std::make_shared<ValueType[]>(total_size_in_elements);
 
-    // switch (init_code) {
-    // case NONE:
-    //   break;
-    // case ZERO:
-    //   for (size_t i = 0; i < total_element_count; i++) {
-    //     data[i] = 0;
-    //   }
-    //   break;
-    // case MAX:
-    //   for (size_t i = 0; i < total_element_count; i++) {
-    //     data[i] = std::numeric_limits<ValueType>::max();
-    //   }
-    //   break;
-    // case MIN:
-    //   for (size_t i = 0; i < total_element_count; i++) {
-    //     data[i] = std::numeric_limits<ValueType>::min();
-    //   }
-    //   break;
-    // case IOTA:
-    //   for (size_t i = 0; i < total_element_count; i++) {
-    //     data[i] = i;
-    //   }
-    //   break;
-    // default:
-    //   // unreachable
-    //   std::abort();
-    //   break;
-    // }
+    switch (init_code) {
+    case NONE:
+      break;
+    case ZERO:
+      for (size_t i = 0; i < total_size_in_elements; i++) {
+        data[i] = 0;
+      }
+      break;
+    case MAX:
+      for (size_t i = 0; i < total_size_in_elements; i++) {
+        data[i] = std::numeric_limits<ValueType>::max();
+      }
+      break;
+    case MIN:
+      for (size_t i = 0; i < total_size_in_elements; i++) {
+        data[i] = std::numeric_limits<ValueType>::min();
+      }
+      break;
+    case IOTA:
+      std::vector<size_t> linear_strides;
+      linear_strides.resize(rank);
+      linear_stides[0] = 1;
+      for (size_t i = 1; i < rank; i++) {
+        linear_strides[i] = linear_stride[i-1] * tensor_shape[i-1];
+      }
+      std::vector<size_t> current_ids;
+      current_ids.resize(rank);
+
+      for (size_t i = 0; i < total_element_count; i++) {
+        size_t tmp = i;
+        for (int64_t j = rank-1; j >= 0; j--) {
+          current_ids[static_cast<size_t>(j)] =
+              tmp / linear_strides[static_cast<size_t>(j)];
+          tmp = tmp % linear_strides[static_cast<size_t>(j)];
+        }
+        set(current_ids, i);
+      }
+      break;
+    default:
+      // unreachable
+      std::abort();
+      break;
+    }
   }
 
   //Copies data
@@ -125,7 +142,8 @@ class ChunkedTensor : public Tensor {
   }
 
   explicit ChunkedTensor<ValueType>(ChunkedTensor<ValueType> &&other)
-      : Tensor<ValueType>(other.tensor_shape), chunk_shape(other.chunk_shape),
+      : Tensor<ValueType>(other.tensor_shape),
+        chunk_shape(other.chunk_shape),
         chunk_element_count(other.chunk_element_count),
         chunk_strides(other.chunk_strides),
         intra_chunk_strides(other.intra_chunk_strides),
@@ -160,8 +178,37 @@ class ChunkedTensor : public Tensor {
     }
   }
 
-  //TODO:
-  //from list of contiguous;from contiguous; as freestanding since they can fail
+  // Use this + rechunk() for a conversion from a contiguous tensor to a chunked
+  // one with artirary chunking
+  explicit ChunkedTensor<ValueType>(const ContiguousTensor<ValueType> &other)
+      : Tensor<ValueType>(other.tensor_shape), chunk_shape(other.tensor_shape) {
+    chunk_strides.resize(rank);
+    intra_chunk_strides.resize(rank);
+
+    if (rank > 0) {
+      intra_chunk_strides[0] = 1;
+    }
+    for (size_t i = 1; i < rank; i++) {
+      intra_chunk_strides[i] = intra_chunk_strides[i-1] * chunk_shape[i-1];
+    }
+
+    chunk_element_count = total_element_count;
+
+    total_chunk_count = 1;
+    chunks_per_dim.resize(rank);
+    for (size_t i = 0; i < rank; i++) {
+      chunks_per_dim[i] = 1;
+      total_chunk_count = 1;
+      chunk_strides[i] = chunk_element_count;
+    }
+
+    total_size_in_elements = total_element_count;
+
+    data = std::make_shared<ValueType[]>(total_size_in_elements);
+
+    std::memcpy(data.get(), other.data.get(),
+                total_size_in_elements * sizeof(ValueType));
+  }
 
   bool operator==(const ChunkedTensor<ValueType> &rhs) const {
     if (tensor_shape != rhs.tensor_shape ||
@@ -357,6 +404,29 @@ class ChunkedTensor : public Tensor {
 
     std::memcpy(&data[linear_id], values,
                 chunk_element_count * sizeof(ValueType));
+  }
+  bool trySetChunk(const std::vector<size_t> &chunk_indices,
+                   const ContiguousTensor<ValueType> &other) {
+    if (chunk_indices.size() != rank || other.rank != rank) {
+      return false;
+    }
+    if (rank == 0) {
+      data[0] = other.data[0];
+      return true;
+    }
+
+    for (size_t i = 0; i < rank; i++) {
+      if (chunk_indices[i] >= tensor_shape[i] ||
+          other.tensor_shape[i] != chunk_shape[i]) {
+        return false;
+      }
+    }
+
+    size_t linear_id = getLinearIdFromChunkIds(chunk_indices);
+
+    std::memcpy(&data[linear_id], other.data.get(),
+                chunk_element_count * sizeof(ValueType));
+    return true;
   }
 
   bool tryRechunk(const std::vector<size_t> &new_chunk_shape) {
