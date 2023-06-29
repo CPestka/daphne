@@ -454,7 +454,7 @@ class ChunkedTensor : public Tensor {
       new_chunks_per_dim[i] = tensor_shape[i] % new_chunk_shape[i] == 0
                               ? tensor_shape[i] / new_chunk_shape[i]
                               : (tensor_shape[i] / new_chunk_shape[i]) + 1;
-      new_total_cunk_count =
+      new_total_chunk_count =
           i == 0 ? new_chunks_per_dim[0] : new_total_cunk_count * new_chunks_per_dim[i];
       new_chunk_strides[i] = i == 0 ? new_chunk_element_count
                                 : new_chunk_strides[i - 1] * new_chunks_per_dim[i - 1];
