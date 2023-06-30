@@ -22,12 +22,14 @@
 
 #include <runtime/local/datastructures/Structure.h>
 
-template <typename ValueType> class Tensor : public Structure {
-protected:
+template <typename ValueType>
+class Tensor : public Structure {
+public:
   size_t rank;
   std::vector<size_t> tensor_shape;
   size_t total_element_count;
 
+protected:
   Tensor(const std::vector<size_t> &tensor_shape)
       : Structure(tensor_shape.size() >= 1 ? tensor_shape[0] : 0,
                   tensor_shape.size() >= 2 ? tensor_shape[1] : 0),
@@ -50,16 +52,18 @@ protected:
 
   virtual ~Tensor(){};
 
+public:
+
   // These pure virtual functions are only well defined for a ND-tensor in the
   // case of N=2
   // Use provided dice() function instead
-  virtual Tensor* sliceRow(size_t rl, size_t ru) const {
+  virtual Tensor* sliceRow(size_t rl, size_t ru) const override {
     std::abort();
   }
-  virtual Tensor* sliceCol(size_t cl, size_t cu) const {
+  virtual Tensor* sliceCol(size_t cl, size_t cu) const override {
     std::abort();
   }
-  virtual Tensor* slice(size_t rl, size_t ru, size_t cl, size_t cu) const {
+  virtual Tensor* slice(size_t rl, size_t ru, size_t cl, size_t cu) const override {
     std::abort();
   }
 };
