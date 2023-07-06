@@ -84,24 +84,49 @@ public:
     }
   };
 
-  ContiguousTensor<ValueType>(const ContiguousTensor<ValueType> &other)
-      : Tensor<ValueType>(other.tensor_shape), strides(other.strides), data(other.data) {};
+  ContiguousTensor<ValueType>(ContiguousTensor<ValueType>* other)
+      : Tensor<ValueType>(other->tensor_shape), strides(other->strides), data(other->data) {};
 
-  ContiguousTensor<ValueType>(ContiguousTensor<ValueType> &&other)
-      : Tensor<ValueType>(other.tensor_shape), strides(other.strides) {
-    data = std::move(other.data);
-  };
-
-  ContiguousTensor<ValueType>(const DenseMatrix<ValueType> &other)
-      : Tensor<ValueType>(other.numRows, other.numCols), data(other.values) {
-    strides = {1, other.numCols};
+  ContiguousTensor<ValueType>(DenseMatrix<ValueType>* other)
+      : Tensor<ValueType>(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
+    strides = {1, other->getNumCols()};
   }
 
-  ContiguousTensor<ValueType>(DenseMatrix<ValueType> &&other)
-      : Tensor<ValueType>(other.numRows, other.numCols) {
-    strides = {1, other.numCols};
-    data = std::move(other.values);
+  //Copies passed data
+  ContiguousTensor<ValueType>(ValueType* input_data,
+                              const std::vector<size_t> &tensor_shape)
+      : Tensor<ValueType>(tensor_shape),
+        data(new ValueType[this->total_element_count],
+             std::default_delete<ValueType[]>()) {
+    strides.resize(this->rank);
+    if (this->rank > 0) {
+      strides[0] = 1;
+    }
+    
+    for (size_t i = 1; i < this->rank; i++) {
+      strides[i] = strides[i-1] * this->tensor_shape[i-1];
+    }
+
+    std::memcpy(data.get(), input_data,
+                this->total_element_count * sizeof(ValueType));
   }
+
+  //Takes ownership of data
+  ContiguousTensor<ValueType>(std::unique_ptr<ValueType[]> input_data,
+                              const std::vector<size_t> &tensor_shape)
+      : Tensor<ValueType>(tensor_shape),
+        data(std::move(input_data)) {
+    strides.resize(this->rank);
+    if (this->rank > 0) {
+      strides[0] = 1;
+    }
+    
+    for (size_t i = 1; i < this->rank; i++) {
+      strides[i] = strides[i-1] * this->tensor_shape[i-1];
+    }
+  }
+
+  ~ContiguousTensor<ValueType>() override = default;
 
   bool operator==(const ContiguousTensor<ValueType> &rhs) {
     if (this->tensor_shape != rhs.tensor_shape) {
@@ -112,12 +137,13 @@ public:
         data.get(), rhs.data.get(), this->total_element_count * sizeof(ValueType)));
   }
 
-  std::optional<DenseMatrix<ValueType>> tryToGetDenseMatrix() const {
+  DenseMatrix<ValueType>* tryToGetDenseMatrix() const {
     if (this->rank != 2) {
-      return std::nullopt;
+      return nullptr;
     }
 
-    return DenseMatrix<ValueType>(this->numRows, this->numCols, data);
+    return DataObjectFactory::create<DenseMatrix<ValueType>>(
+        this->getNumRows(), this->getNumCols(), data);
   }
 
   std::optional<ValueType> tryGet(const std::vector<size_t> &element_indices) const {
@@ -205,16 +231,16 @@ public:
   }
 
   //Ranges are inclusive on both boundaries
-  std::optional<ContiguousTensor<ValueType>>
+  ContiguousTensor<ValueType>*
   tryDice(const std::vector<std::pair<size_t, size_t>> &index_ranges) const {
     if (index_ranges.size() != this->rank) {
-      return std::nullopt;
+      return nullptr;
     }
     for (size_t i = 0; i < this->rank; i++) {
       if (std::get<0>(index_ranges[i]) >= this->tensor_shape[i] ||
           std::get<1>(index_ranges[i]) >= this->tensor_shape[i] ||
           std::get<0>(index_ranges[i]) > std::get<1>(index_ranges[i])) {
-        return std::nullopt;  
+        return nullptr;  
       }
     }
 
@@ -224,24 +250,25 @@ public:
       new_tensor_shape[i] = std::get<1>(index_ranges[i]) - std::get<0>(index_ranges[i]) + 1;
     }
 
-    ContiguousTensor<ValueType> result(new_tensor_shape, NONE);
+    ContiguousTensor<ValueType>* new_tensor =
+        DataObjectFactory::create<ContiguousTensor<ValueType>>(new_tensor_shape,
+                                                               NONE);
 
     std::vector<size_t> current_indices;
     current_indices.resize(this->rank);
-    for (size_t i = 0; i < result.total_element_count; i++) {
+    for (size_t i = 0; i < new_tensor->total_element_count; i++) {
       size_t tmp = i;
 
       for (int64_t j = this->rank-1; j >= 0; j--) {
         current_indices[static_cast<size_t>(j)] =
-            (tmp / strides[static_cast<size_t>(j)]) +
+            (tmp / new_tensor->strides[static_cast<size_t>(j)]) +
             std::get<0>(index_ranges[static_cast<size_t>(j)]);
-        tmp = tmp % strides[static_cast<size_t>(j)];
+        tmp = tmp % new_tensor->strides[static_cast<size_t>(j)];
       }
-
-      result.data.get()[i] = get(current_indices);
+      new_tensor->data[i] = get(current_indices);
     }
 
-    return result;
+    return new_tensor;
   }
 
   //Removes all dimensions with a size of 1
