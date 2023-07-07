@@ -143,7 +143,7 @@ public:
     }
 
     return DataObjectFactory::create<DenseMatrix<ValueType>>(
-        this->getNumRows(), this->getNumCols(), data);
+        this->tensor_shape[1], this->tensor_shape[0], data);
   }
 
   std::optional<ValueType> tryGet(const std::vector<size_t> &element_indices) const {

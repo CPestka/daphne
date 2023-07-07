@@ -454,18 +454,19 @@ public:
     std::vector<size_t> new_chunks_per_dim;
     new_chunk_strides.resize(this->rank);
     new_chunks_per_dim.resize(this->rank);
-    size_t new_total_chunk_count = 0;
+    size_t new_total_chunk_count = 1;
     for (size_t i = 0; i < this->rank; i++) {
       new_chunks_per_dim[i] = this->tensor_shape[i] % new_chunk_shape[i] == 0
                               ? this->tensor_shape[i] / new_chunk_shape[i]
                               : (this->tensor_shape[i] / new_chunk_shape[i]) + 1;
-      new_total_chunk_count =
-          i == 0 ? new_chunks_per_dim[0] : new_total_chunk_count * new_chunks_per_dim[i];
+      new_total_chunk_count = new_total_chunk_count * new_chunks_per_dim[i];
       new_chunk_strides[i] = i == 0 ? new_chunk_element_count
                                 : new_chunk_strides[i - 1] * new_chunks_per_dim[i - 1];
     }
-  
-    size_t new_total_size_in_elements = new_total_chunk_count * new_chunk_element_count;
+
+    size_t new_total_size_in_elements =
+        new_total_chunk_count * new_chunk_element_count;
+
     std::shared_ptr<ValueType[]> new_data(
         new ValueType[new_total_size_in_elements],
         std::default_delete<ValueType[]>());
@@ -497,7 +498,7 @@ public:
         for (int64_t k = this->rank-1; k >= 0; k--) {
           current_old_element_ids[static_cast<size_t>(k)] =
               tmp / intra_chunk_strides[static_cast<size_t>(k)] +
-              current_old_chunk_ids[k] * chunk_strides[k];
+              current_old_chunk_ids[k] * chunk_shape[k];
           tmp = tmp % intra_chunk_strides[static_cast<size_t>(k)];
         }
 
@@ -515,8 +516,7 @@ public:
 
         size_t new_linear_id = 0;
         for (size_t k = 0; k < this->rank; k++) {
-          size_t current_new_chunk_id =
-              current_old_element_ids[k] / new_chunk_shape[k];
+          size_t current_new_chunk_id = current_old_element_ids[k] / new_chunk_shape[k];
           size_t current_new_intra_chunk_id = current_old_element_ids[k] % new_chunk_shape[k];
 
           new_linear_id +=
@@ -524,7 +524,7 @@ public:
               current_new_intra_chunk_id * new_intra_chunk_strides[k];
         }
 
-        new_data[new_linear_id] = data.get()[current_chunk_offset + j];
+        new_data[new_linear_id] = data[current_chunk_offset + j];
       }
     }
 

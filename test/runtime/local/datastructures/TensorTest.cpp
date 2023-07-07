@@ -249,8 +249,8 @@ TEMPLATE_TEST_CASE("Tensor dicing, rechunking and conversions", TAG_DATASTRUCTUR
     ChunkedTensor<TestType> *cht1 =
         DataObjectFactory::create<ChunkedTensor<TestType>>(tensor_shape,
                                                            chunk_shape, IOTA);
-    REQUIRE(cht1->tryRechunk({2,4,2}));
-
+    REQUIRE(cht1->tryRechunk({2, 4, 2}));
+    
     for (size_t i = 0; i < 3; i++) {
       for (size_t j = 0; j < 4; j++) {
         for (size_t k = 0; k < 2; k++) {
@@ -282,11 +282,11 @@ TEMPLATE_TEST_CASE("Tensor dicing, rechunking and conversions", TAG_DATASTRUCTUR
         DataObjectFactory::create<DenseMatrix<TestType>>(3, 4, data);
     ContiguousTensor<TestType> *ct1 =
         DataObjectFactory::create<ContiguousTensor<TestType>>(matrix);
-
+    
     for (size_t i = 0; i < 4; i++) {
       for (size_t j = 0; j < 3; j++) {
-        REQUIRE(matrix->get(i,j) == static_cast<TestType>(i + 4 * j));
-        REQUIRE(matrix->get(i,j) == ct1->get({i,j}));
+        REQUIRE(matrix->get(j,i) == static_cast<TestType>(i + 4 * j));
+        REQUIRE(matrix->get(j,i) == ct1->get({i,j}));
       }
     }
 
@@ -308,7 +308,7 @@ TEMPLATE_TEST_CASE("Tensor dicing, rechunking and conversions", TAG_DATASTRUCTUR
 
     for (size_t i = 0; i < 4; i++) {
       for (size_t j = 0; j < 3; j++) {
-        REQUIRE(matrix->get(i,j) == ct1->get({i,j}));
+        REQUIRE(matrix->get(j,i) == ct1->get({i,j}));
       }
     }
 
