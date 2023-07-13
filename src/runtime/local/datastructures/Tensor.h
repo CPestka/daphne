@@ -25,47 +25,50 @@
 template <typename ValueType>
 class Tensor : public Structure {
 public:
-  size_t rank;
-  std::vector<size_t> tensor_shape;
-  size_t total_element_count;
+    size_t rank;
+    std::vector<size_t> tensor_shape;
+    size_t total_element_count;
 
 protected:
-  Tensor(const std::vector<size_t> &tensor_shape)
-      : Structure(tensor_shape.size() >= 1 ? tensor_shape[0] : 0,
-                  tensor_shape.size() >= 2 ? tensor_shape[1] : 0),
-        rank(tensor_shape.size()), tensor_shape(tensor_shape) {
-    if (rank > 0) {
-      total_element_count = tensor_shape[0];
-      for (size_t i = 1; i < rank; i++) {
-        total_element_count *= tensor_shape[i];
-      }
-    } else {
-      total_element_count = 1;
-    }
-  };
-  Tensor(size_t numRows, size_t numCols)
-      : Structure(numRows, numCols), rank(2) {
-    tensor_shape.push_back(numCols);
-    tensor_shape.push_back(numRows);
-    total_element_count = numRows * numCols;
-  };
+    Tensor(const std::vector<size_t> &tensor_shape)
+        : Structure(tensor_shape.size() >= 1 ? tensor_shape[0] : 0,
+                    tensor_shape.size() >= 2 ? tensor_shape[1] : 0),
+          rank(tensor_shape.size()), tensor_shape(tensor_shape)
+    {
+        if (rank > 0) {
+            total_element_count = tensor_shape[0];
+            for (size_t i = 1; i < rank; i++) {
+                total_element_count *= tensor_shape[i];
+            }
+        } else {
+            total_element_count = 1;
+        }
+    };
+  
+    Tensor(size_t numRows, size_t numCols) : Structure(numRows, numCols), rank(2) {
+        tensor_shape.push_back(numCols);
+        tensor_shape.push_back(numRows);
+        total_element_count = numRows * numCols;
+    };
 
-  virtual ~Tensor(){};
+    virtual ~Tensor(){};
 
 public:
 
-  // These pure virtual functions are only well defined for a ND-tensor in the
-  // case of N=2
-  // Use provided dice() function instead
-  virtual Tensor* sliceRow(size_t rl, size_t ru) const override {
-    std::abort();
-  }
-  virtual Tensor* sliceCol(size_t cl, size_t cu) const override {
-    std::abort();
-  }
-  virtual Tensor* slice(size_t rl, size_t ru, size_t cl, size_t cu) const override {
-    std::abort();
-  }
+    // These pure virtual functions are only well defined for a ND-tensor in the
+    // case of N=2
+    // Use provided dice() function instead
+    virtual Tensor* sliceRow(size_t rl, size_t ru) const override {
+        std::abort();
+    }
+    
+    virtual Tensor* sliceCol(size_t cl, size_t cu) const override {
+        std::abort();
+    }
+    
+    virtual Tensor* slice(size_t rl, size_t ru, size_t cl, size_t cu) const override {
+        std::abort();
+    }
 };
 
 enum InitCode { NONE, ZERO, MAX, MIN, IOTA };

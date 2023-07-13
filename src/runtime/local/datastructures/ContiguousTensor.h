@@ -33,257 +33,254 @@
 template <typename ValueType>
 class ContiguousTensor : public Tensor<ValueType> {
 public:
-  std::vector<size_t> strides;
+    std::vector<size_t> strides;
 
-  std::shared_ptr<ValueType[]> data;
+    std::shared_ptr<ValueType[]> data;
 
-  ContiguousTensor<ValueType>(const std::vector<size_t> &tensor_shape,
-                              InitCode init_code)
-      : Tensor<ValueType>(tensor_shape),
-        data(new ValueType[this->total_element_count],
-             std::default_delete<ValueType[]>()) {
-    strides.resize(this->rank);
-    if (this->rank > 0) {
-      strides[0] = 1;
-    }
+    ContiguousTensor<ValueType>(const std::vector<size_t> &tensor_shape, InitCode init_code) 
+      : Tensor<ValueType>(tensor_shape), data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>())
+    {
+        strides.resize(this->rank);
+        if (this->rank > 0) {
+          strides[0] = 1;
+        }
     
-    for (size_t i = 1; i < this->rank; i++) {
-      strides[i] = strides[i-1] * this->tensor_shape[i-1];
+        for (size_t i = 1; i < this->rank; i++) {
+            strides[i] = strides[i-1] * this->tensor_shape[i-1];
+        }
+
+        // No C++20 sigh*
+        // data = std::make_shared<ValueType[]>(this->total_element_count);
+
+        switch (init_code) {
+            case NONE: {}
+                break;
+            case ZERO: {
+                for (size_t i = 0; i < this->total_element_count; i++) {
+                    data.get()[i] = 0;
+                }
+                break;
+            }
+            case MAX: {
+                for (size_t i = 0; i < this->total_element_count; i++) {
+                    data.get()[i] = std::numeric_limits<ValueType>::max();
+                }
+                break;
+            }
+            case MIN: {
+                for (size_t i = 0; i < this->total_element_count; i++) {
+                    data.get()[i] = std::numeric_limits<ValueType>::min();
+                }
+                break;
+            }
+            case IOTA: {
+                for (size_t i = 0; i < this->total_element_count; i++) {
+                    data.get()[i] = i;
+                }
+                break;
+            }
+            default: {
+                // unreachable
+                std::abort();
+                break;
+            }
+        }
+    };
+
+    ContiguousTensor<ValueType>(ContiguousTensor<ValueType>* other) : Tensor<ValueType>(other->tensor_shape), strides(other->strides), data(other->data) {};
+
+    ContiguousTensor<ValueType>(DenseMatrix<ValueType>* other)
+        : Tensor<ValueType>(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr())
+    {
+        strides = {1, other->getNumCols()};
     }
 
-    // No C++20 sigh*
-    // data = std::make_shared<ValueType[]>(this->total_element_count);
+    //Copies passed data
+    ContiguousTensor<ValueType>(ValueType* input_data, const std::vector<size_t> &tensor_shape)
+        : Tensor<ValueType>(tensor_shape), data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>())
+    {
+        strides.resize(this->rank);
+        if (this->rank > 0) {
+            strides[0] = 1;
+        }
+        
+        for (size_t i = 1; i < this->rank; i++) {
+            strides[i] = strides[i-1] * this->tensor_shape[i-1];
+        }
 
-    switch (init_code) {
-    case NONE: {}
-      break;
-    case ZERO: {
-      for (size_t i = 0; i < this->total_element_count; i++) {
-        data.get()[i] = 0;
-      }
-    } break;
-    case MAX: {
-      for (size_t i = 0; i < this->total_element_count; i++) {
-        data.get()[i] = std::numeric_limits<ValueType>::max();
-      }
-    } break;
-    case MIN:  {
-      for (size_t i = 0; i < this->total_element_count; i++) {
-        data.get()[i] = std::numeric_limits<ValueType>::min();
-      }
-    } break;
-    case IOTA: {
-      for (size_t i = 0; i < this->total_element_count; i++) {
-        data.get()[i] = i;
-      }
-    } break;
-    default:
-      // unreachable
-      std::abort();
-      break;
+        std::memcpy(data.get(), input_data, this->total_element_count * sizeof(ValueType));
     }
-  };
 
-  ContiguousTensor<ValueType>(ContiguousTensor<ValueType>* other)
-      : Tensor<ValueType>(other->tensor_shape), strides(other->strides), data(other->data) {};
-
-  ContiguousTensor<ValueType>(DenseMatrix<ValueType>* other)
-      : Tensor<ValueType>(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
-    strides = {1, other->getNumCols()};
-  }
-
-  //Copies passed data
-  ContiguousTensor<ValueType>(ValueType* input_data,
-                              const std::vector<size_t> &tensor_shape)
-      : Tensor<ValueType>(tensor_shape),
-        data(new ValueType[this->total_element_count],
-             std::default_delete<ValueType[]>()) {
-    strides.resize(this->rank);
-    if (this->rank > 0) {
-      strides[0] = 1;
-    }
+    //Takes ownership of data
+    ContiguousTensor<ValueType>(std::unique_ptr<ValueType[]> input_data, const std::vector<size_t> &tensor_shape)
+        : Tensor<ValueType>(tensor_shape), data(std::move(input_data))
+    {
+        strides.resize(this->rank);
+        if (this->rank > 0) {
+            strides[0] = 1;
+        }
     
-    for (size_t i = 1; i < this->rank; i++) {
-      strides[i] = strides[i-1] * this->tensor_shape[i-1];
+        for (size_t i = 1; i < this->rank; i++) {
+            strides[i] = strides[i-1] * this->tensor_shape[i-1];
+        }
     }
 
-    std::memcpy(data.get(), input_data,
-                this->total_element_count * sizeof(ValueType));
-  }
+    ~ContiguousTensor<ValueType>() override = default;
 
-  //Takes ownership of data
-  ContiguousTensor<ValueType>(std::unique_ptr<ValueType[]> input_data,
-                              const std::vector<size_t> &tensor_shape)
-      : Tensor<ValueType>(tensor_shape),
-        data(std::move(input_data)) {
-    strides.resize(this->rank);
-    if (this->rank > 0) {
-      strides[0] = 1;
+    bool operator==(const ContiguousTensor<ValueType> &rhs) {
+        if (this->tensor_shape != rhs.tensor_shape) {
+            return false;
+        }
+
+        return !static_cast<bool>(std::memcmp(data.get(), rhs.data.get(), this->total_element_count * sizeof(ValueType)));
     }
+
+    DenseMatrix<ValueType>* tryToGetDenseMatrix() const {
+        if (this->rank != 2) {
+            return nullptr;
+        }
+
+        return DataObjectFactory::create<DenseMatrix<ValueType>>(this->tensor_shape[1], this->tensor_shape[0], data);
+    }
+
+    std::optional<ValueType> tryGet(const std::vector<size_t> &element_indices) const {
+        if (element_indices.size() != this->rank) {
+            return std::nullopt;
+        }
+        
+        if (this->rank == 0) {
+            return data.get()[0];
+        }
+
+        for (size_t i = 0; i < this->rank; i++) {
+            if (element_indices[i] >= this->tensor_shape[i]) {
+                return std::nullopt;
+            }
+        }
+
+        size_t linear_id = element_indices[0];
+        for (size_t i = 1; i < this->rank; i++) {
+            linear_id += element_indices[i] * strides[i];
+        }
+
+        return data.get()[linear_id];
+    }
+
+    ValueType get(const std::vector<size_t> &element_indices) const {
+        if (this->rank == 0) {
+            return data.get()[0];
+        }
+        
+        size_t linear_id = element_indices[0];
+        for (size_t i = 1; i < this->rank; i++) {
+            linear_id += element_indices[i] * strides[i];
+        }
+        return data.get()[linear_id];
+    }
+
+    bool trySet(const std::vector<size_t> &element_indices, ValueType value) {
+        if (element_indices.size() != this->rank || this->rank == 0) {
+            return false;
+        }
+
+        for (size_t i = 0; i < this->rank; i++) {
+            if (element_indices[i] >= this->tensor_shape[i]) {
+                return false;
+            }
+        }
+
+        size_t linear_id = element_indices[0];
+        for (size_t i = 1; i < this->rank; i++) {
+            linear_id += element_indices[i] * strides[i];
+        }
+        data.get()[linear_id] = value;
+
+        return true;
+    }
+
+    void set(const std::vector<size_t> &element_indices, ValueType value) {
+        size_t linear_id = element_indices[0];
+        for (size_t i = 1; i < this->rank; i++) {
+            linear_id += element_indices[i] * strides[i];
+        }
+        data.get()[linear_id] = value;
+    }
+
+    void print(std::ostream &os) const override {
+        os << "ContiguousTensor with shape: [";
+        for (size_t i = 0; i < this->rank; i++) {
+            os << this->tensor_shape[i];
+            if (i != this->rank - 1) {
+                os << ",";
+            }
+        }
+        os << "]\n" << "Elementtype: " << ValueTypeUtils::cppNameFor<ValueType> << std::endl;
     
-    for (size_t i = 1; i < this->rank; i++) {
-      strides[i] = strides[i-1] * this->tensor_shape[i-1];
-    }
-  }
+        if (this->rank == 0) {
+            os << data.get()[0] << std::endl;
+            return;
+        }
 
-  ~ContiguousTensor<ValueType>() override = default;
-
-  bool operator==(const ContiguousTensor<ValueType> &rhs) {
-    if (this->tensor_shape != rhs.tensor_shape) {
-      return false;
-    }
-
-    return !static_cast<bool>(std::memcmp(
-        data.get(), rhs.data.get(), this->total_element_count * sizeof(ValueType)));
-  }
-
-  DenseMatrix<ValueType>* tryToGetDenseMatrix() const {
-    if (this->rank != 2) {
-      return nullptr;
+        for (size_t i = 0; i < this->total_element_count; i++) {
+            if (i % this->tensor_shape[0] == 0) {
+                os << "\n";
+            }
+            os << data.get()[i] << " ";
+        }
+        os << std::endl;
     }
 
-    return DataObjectFactory::create<DenseMatrix<ValueType>>(
-        this->tensor_shape[1], this->tensor_shape[0], data);
-  }
+    //Ranges are inclusive on both boundaries
+    ContiguousTensor<ValueType>* tryDice(const std::vector<std::pair<size_t, size_t>> &index_ranges) const {
+        if (index_ranges.size() != this->rank) {
+            return nullptr;
+        }
+        for (size_t i = 0; i < this->rank; i++) {
+            if (std::get<0>(index_ranges[i]) >= this->tensor_shape[i] ||
+                std::get<1>(index_ranges[i]) >= this->tensor_shape[i] ||
+                std::get<0>(index_ranges[i]) > std::get<1>(index_ranges[i])) {
+                    return nullptr;
+            }
+        }
 
-  std::optional<ValueType> tryGet(const std::vector<size_t> &element_indices) const {
-    if (element_indices.size() != this->rank) {
-      return std::nullopt;
-    }
-    if (this->rank == 0) {
-      return data.get()[0];
-    }
+        std::vector<size_t> new_tensor_shape;
+        new_tensor_shape.resize(this->rank);
+        for (size_t i = 0; i < this->rank; i++) {
+            new_tensor_shape[i] = std::get<1>(index_ranges[i]) - std::get<0>(index_ranges[i]) + 1;
+        }
 
-    for (size_t i = 0; i < this->rank; i++) {
-      if (element_indices[i] >= this->tensor_shape[i]) {
-        return std::nullopt;
-      }
-    }
+        ContiguousTensor<ValueType>* new_tensor = DataObjectFactory::create<ContiguousTensor<ValueType>>(new_tensor_shape, NONE);
 
-    size_t linear_id = element_indices[0];
-    for (size_t i = 1; i < this->rank; i++) {
-      linear_id += element_indices[i] * strides[i];
-    }
+        std::vector<size_t> current_indices;
+        current_indices.resize(this->rank);
+        for (size_t i = 0; i < new_tensor->total_element_count; i++) {
+            size_t tmp = i;
 
-    return data.get()[linear_id];
-  }
-  ValueType get(const std::vector<size_t> &element_indices) const {
-    if (this->rank == 0) {
-      return data.get()[0];
-    }
-    size_t linear_id = element_indices[0];
-    for (size_t i = 1; i < this->rank; i++) {
-      linear_id += element_indices[i] * strides[i];
-    }
-    return data.get()[linear_id];
-  }
+            for (int64_t j = this->rank-1; j >= 0; j--) {
+                current_indices[static_cast<size_t>(j)] =
+                    (tmp / new_tensor->strides[static_cast<size_t>(j)]) +
+                    std::get<0>(index_ranges[static_cast<size_t>(j)]);
+                tmp = tmp % new_tensor->strides[static_cast<size_t>(j)];
+            }
+            new_tensor->data[i] = get(current_indices);
+        }
 
-  bool trySet(const std::vector<size_t> &element_indices, ValueType value) {
-    if (element_indices.size() != this->rank || this->rank == 0) {
-      return false;
+        return new_tensor;
     }
 
-    for (size_t i = 0; i < this->rank; i++) {
-      if (element_indices[i] >= this->tensor_shape[i]) {
-        return false;
-      }
+    //Removes all dimensions with a size of 1
+    void reduceRank() {
+        for (size_t i = 0; i < this->rank; i++) {
+            if (this->tensor_shape[i] == 1) {
+                this->tensor_shape.erase(this->tensor_shape.begin() + i);
+                strides.erase(strides.begin() + i);
+            }
+        }
+        this->rank = this->tensor_shape.size();
     }
 
-    size_t linear_id = element_indices[0];
-    for (size_t i = 1; i < this->rank; i++) {
-      linear_id += element_indices[i] * strides[i];
+    size_t serialize(std::vector<char> &buf) const override {
+        // TODO
+        return 0;
     }
-    data.get()[linear_id] = value;
-
-    return true;
-  }
-  void set(const std::vector<size_t> &element_indices, ValueType value) {
-    size_t linear_id = element_indices[0];
-    for (size_t i = 1; i < this->rank; i++) {
-      linear_id += element_indices[i] * strides[i];
-    }
-    data.get()[linear_id] = value;
-  }
-
-  void print(std::ostream &os) const override {
-    os << "ContiguousTensor with shape: [";
-    for (size_t i = 0; i < this->rank; i++) {
-      os << this->tensor_shape[i];
-      if (i != this->rank - 1) {
-        os << ",";
-      }
-    }
-    os << "]\n"
-       << "Elementtype: " << ValueTypeUtils::cppNameFor<ValueType> << std::endl;
-    
-    if (this->rank == 0) {
-      os << data.get()[0] << std::endl;
-      return;
-    }
-
-    for (size_t i = 0; i < this->total_element_count; i++) {
-      if (i % this->tensor_shape[0] == 0) {
-        os << "\n";
-      }
-      os << data.get()[i] << " ";
-    }
-    os << std::endl;
-  }
-
-  //Ranges are inclusive on both boundaries
-  ContiguousTensor<ValueType>*
-  tryDice(const std::vector<std::pair<size_t, size_t>> &index_ranges) const {
-    if (index_ranges.size() != this->rank) {
-      return nullptr;
-    }
-    for (size_t i = 0; i < this->rank; i++) {
-      if (std::get<0>(index_ranges[i]) >= this->tensor_shape[i] ||
-          std::get<1>(index_ranges[i]) >= this->tensor_shape[i] ||
-          std::get<0>(index_ranges[i]) > std::get<1>(index_ranges[i])) {
-        return nullptr;  
-      }
-    }
-
-    std::vector<size_t> new_tensor_shape;
-    new_tensor_shape.resize(this->rank);
-    for (size_t i = 0; i < this->rank; i++) {
-      new_tensor_shape[i] = std::get<1>(index_ranges[i]) - std::get<0>(index_ranges[i]) + 1;
-    }
-
-    ContiguousTensor<ValueType>* new_tensor =
-        DataObjectFactory::create<ContiguousTensor<ValueType>>(new_tensor_shape,
-                                                               NONE);
-
-    std::vector<size_t> current_indices;
-    current_indices.resize(this->rank);
-    for (size_t i = 0; i < new_tensor->total_element_count; i++) {
-      size_t tmp = i;
-
-      for (int64_t j = this->rank-1; j >= 0; j--) {
-        current_indices[static_cast<size_t>(j)] =
-            (tmp / new_tensor->strides[static_cast<size_t>(j)]) +
-            std::get<0>(index_ranges[static_cast<size_t>(j)]);
-        tmp = tmp % new_tensor->strides[static_cast<size_t>(j)];
-      }
-      new_tensor->data[i] = get(current_indices);
-    }
-
-    return new_tensor;
-  }
-
-  //Removes all dimensions with a size of 1
-  void reduceRank() {
-    for (size_t i = 0; i < this->rank; i++) {
-      if (this->tensor_shape[i] == 1) {
-        this->tensor_shape.erase(this->tensor_shape.begin() + i);
-        strides.erase(strides.begin() + i);
-      }
-    }
-    this->rank = this->tensor_shape.size();
-  }
-
-  size_t serialize(std::vector<char> &buf) const override {
-    // TODO
-    return 0;
-  }
 };
