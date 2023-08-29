@@ -40,9 +40,10 @@ public:
     ContiguousTensor<ValueType>(const std::vector<size_t> &tensor_shape, InitCode init_code) 
       : Tensor<ValueType>(tensor_shape), data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>())
     {
+        spdlog::info("ContiguousTensor creation");
         strides.resize(this->rank);
         if (this->rank > 0) {
-          strides[0] = 1;
+            strides[0] = 1;
         }
     
         for (size_t i = 1; i < this->rank; i++) {
@@ -207,14 +208,14 @@ public:
     }
 
     void print(std::ostream &os) const override {
-        os << "ContiguousTensor with shape: [";
+        os << "ContiguousTensor(";
         for (size_t i = 0; i < this->rank; i++) {
             os << this->tensor_shape[i];
             if (i != this->rank - 1) {
-                os << ",";
+                os << "x";
             }
         }
-        os << "]\n" << "Elementtype: " << ValueTypeUtils::cppNameFor<ValueType> << std::endl;
+        os << ", " << ValueTypeUtils::cppNameFor<ValueType> << ")" << std::endl;
     
         if (this->rank == 0) {
             os << data.get()[0] << std::endl;

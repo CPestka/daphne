@@ -2029,6 +2029,7 @@
             [["CSRMatrix", "float"]],
             [["CSRMatrix", "int64_t"]],
             [["CSRMatrix", "uint8_t"]],
+            [["ContiguousTensor", "double"]],
             ["Frame"],
             ["char"]
         ]
@@ -2085,6 +2086,52 @@
             [["DenseMatrix", "int64_t"], "int64_t"],
             [["DenseMatrix", "uint8_t"], "uint8_t"],
             [["CSRMatrix", "double"], "double"]
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "RandTensor.h",
+            "opName": "randTensor3D",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "VTArg",
+                    "isDataType": false
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "DTRes *&",
+                    "name": "res"
+                },
+                {
+                    "type": "size_t",
+                    "name": "numX"
+                },
+                {
+                    "type": "size_t",
+                    "name": "numY"
+                },
+                {
+                    "type": "size_t",
+                    "name": "numZ"
+                },
+                {
+                    "type": "VTArg",
+                    "name": "min"
+                },
+                {
+                    "type": "VTArg",
+                    "name": "max"
+                }
+            ]
+        },
+        "instantiations": [
+            [["ContiguousTensor", "double"], "double"]
         ]
     },
     {
@@ -2644,6 +2691,23 @@
         "kernelTemplate": {
             "header": "NumCells.h",
             "opName": "numCells",
+            "returnType": "size_t",
+            "templateParams": [],
+            "runtimeParams": [
+                {
+                    "type": "const Structure *",
+                    "name": "arg"
+                }
+            ]
+        },
+        "instantiations": [
+            []
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "NumDims.h",
+            "opName": "numDims",
             "returnType": "size_t",
             "templateParams": [],
             "runtimeParams": [

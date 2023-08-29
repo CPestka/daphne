@@ -390,6 +390,19 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
                 numRows, numCols, min, max, sparsity, seed
         ));
     }
+    if (func == "randTensor3D") {
+        checkNumArgsExact(func, numArgs, 5);
+        mlir::Value numX = utils.castSizeIf(args[0]);
+        mlir::Value numY = utils.castSizeIf(args[1]);
+        mlir::Value numZ = utils.castSizeIf(args[2]);
+        mlir::Value min = args[3];
+        mlir::Value max = args[4];
+        auto ptr = static_cast<mlir::Value>(builder.create<RandTensor3DOp>(
+                loc,
+                TensorType::get(builder.getContext(), min.getType()),
+                numX, numY, numZ, min, max));
+        return ptr;
+    }
     if(func == "sample") {
         checkNumArgsExact(func, numArgs, 4);
         mlir::Value range = args[0];
@@ -426,6 +439,8 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
         return createNumOp<NumColsOp>(loc, func, args);
     if(func == "ncell")
         return createNumOp<NumCellsOp>(loc, func, args);
+    if(func == "ndim")
+        return createNumOp<NumDimsOp>(loc, func, args);
 
     // ********************************************************************
     // Elementwise unary

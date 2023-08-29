@@ -158,6 +158,9 @@ public:
                     return "CSRMatrix_" + mlirTypeToCppTypeName(matTy.getElementType(), false);
                 }
             }
+        else if(auto tensTy = t.dyn_cast<mlir::daphne::TensorType>()) {
+            return "ContiguousTensor_" + mlirTypeToCppTypeName(tensTy.getElementType(), false);
+        }
         else if(t.isa<mlir::daphne::FrameType>())
             if(generalizeToStructure)
                 return "Structure";

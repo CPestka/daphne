@@ -205,6 +205,16 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                                                                           "is neither a matrix nor a frame"
                                 );
                         }
+                        else if(op->getResultTypes()[i].isa<mlir::daphne::TensorType>()) {
+                            const ssize_t numRows = shapes[i].first;
+                            const ssize_t numCols = shapes[i].second;
+                            Value rv = op->getResult(i);
+                            const Type rt = rv.getType();
+                            if (auto tt = rt.dyn_cast<daphne::TensorType>()) {
+                                // ToDo(fixme): currently, the shape can only be inferred for up to two dimensions!
+                                rv.setType(tt.withShape(numRows, numCols, numCols));
+                            }
+                        }
                     }
                 }
                 if (doSparsityInference) {
@@ -502,6 +512,8 @@ public:
                 return mt.getNumRows() == -1 || mt.getNumCols() == -1;
             if(auto ft = rt.dyn_cast<daphne::FrameType>())
                 return ft.getNumRows() == -1 || ft.getNumCols() == -1;
+            if (auto tt = rt.dyn_cast<daphne::TensorType>())
+                return tt.getNumX() == -1 || tt.getNumY() == -1 || tt.getNumZ() == -1;
             return false;
         });
     }
