@@ -23,7 +23,8 @@ add_library(DataStructures
         IAllocationDescriptor.h
         MetaDataObject.h
         MetaDataObject.cpp
-        ValueTypeUtils.cpp)
+        ValueTypeUtils.cpp
+        ContiguousTensor.cpp)
 
 target_link_libraries(DataStructures PUBLIC Proto)
 if(USE_CUDA AND CMAKE_CUDA_COMPILER)

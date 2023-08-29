@@ -128,6 +128,8 @@ public:
 
     ~ContiguousTensor<ValueType>() override = default;
 
+    void printValue(std::ostream & os, ValueType val) const;
+
     bool operator==(const ContiguousTensor<ValueType> &rhs) {
         if (this->tensor_shape != rhs.tensor_shape) {
             return false;
@@ -226,7 +228,8 @@ public:
             if (i % this->tensor_shape[0] == 0) {
                 os << "\n";
             }
-            os << data.get()[i] << " ";
+            printValue(os, data.get()[i]);
+            os << " ";
         }
         os << std::endl;
     }
