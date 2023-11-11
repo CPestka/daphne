@@ -204,6 +204,11 @@ std::vector<Type> daphne::RandTensor3DOp::inferTypes() {
     return {daphne::TensorType::get(getContext(), elTy)};
 }
 
+std::vector<Type> daphne::EigenOp::inferTypes() {
+    auto evMatType = getArg().getType().dyn_cast<daphne::MatrixType>();
+    return  {evMatType.withSameElementType(), evMatType};
+}
+
 std::vector<Type> daphne::GroupJoinOp::inferTypes() {
     daphne::FrameType lhsFt = getLhs().getType().dyn_cast<daphne::FrameType>();
     daphne::FrameType rhsFt = getRhs().getType().dyn_cast<daphne::FrameType>();
