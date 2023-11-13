@@ -30,32 +30,32 @@
 #include <runtime/local/datastructures/Tensor.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
 
-template <typename ValueType>
+template<typename ValueType>
 class ContiguousTensor : public Tensor<ValueType> {
-public:
+    public:
     std::vector<size_t> strides;
 
     std::shared_ptr<ValueType[]> data;
 
-    ContiguousTensor<ValueType>(const std::vector<size_t> &tensor_shape, InitCode init_code) 
-      : Tensor<ValueType>(tensor_shape), data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>())
-    {
+    ContiguousTensor<ValueType>(const std::vector<size_t> &tensor_shape, InitCode init_code)
+        : Tensor<ValueType>(tensor_shape),
+          data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>()) {
         spdlog::info("ContiguousTensor creation");
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
         }
-    
+
         for (size_t i = 1; i < this->rank; i++) {
-            strides[i] = strides[i-1] * this->tensor_shape[i-1];
+            strides[i] = strides[i - 1] * this->tensor_shape[i - 1];
         }
 
         // No C++20 sigh*
         // data = std::make_shared<ValueType[]>(this->total_element_count);
 
         switch (init_code) {
-            case NONE: {}
-                break;
+            case NONE: {
+            } break;
             case ZERO: {
                 for (size_t i = 0; i < this->total_element_count; i++) {
                     data.get()[i] = 0;
@@ -88,57 +88,57 @@ public:
         }
     };
 
-    ContiguousTensor<ValueType>(ContiguousTensor<ValueType>* other) : Tensor<ValueType>(other->tensor_shape), strides(other->strides), data(other->data) {};
+    ContiguousTensor<ValueType>(ContiguousTensor<ValueType> *other)
+        : Tensor<ValueType>(other->tensor_shape), strides(other->strides), data(other->data) {};
 
-    ContiguousTensor<ValueType>(DenseMatrix<ValueType>* other)
-        : Tensor<ValueType>(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr())
-    {
+    ContiguousTensor<ValueType>(DenseMatrix<ValueType> *other)
+        : Tensor<ValueType>(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
         strides = {1, other->getNumCols()};
     }
 
-    //Copies passed data
-    ContiguousTensor<ValueType>(ValueType* input_data, const std::vector<size_t> &tensor_shape)
-        : Tensor<ValueType>(tensor_shape), data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>())
-    {
+    // Copies passed data
+    ContiguousTensor<ValueType>(ValueType *input_data, const std::vector<size_t> &tensor_shape)
+        : Tensor<ValueType>(tensor_shape),
+          data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>()) {
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
         }
-        
+
         for (size_t i = 1; i < this->rank; i++) {
-            strides[i] = strides[i-1] * this->tensor_shape[i-1];
+            strides[i] = strides[i - 1] * this->tensor_shape[i - 1];
         }
 
         std::memcpy(data.get(), input_data, this->total_element_count * sizeof(ValueType));
     }
 
-    //Takes ownership of data
+    // Takes ownership of data
     ContiguousTensor<ValueType>(std::unique_ptr<ValueType[]> input_data, const std::vector<size_t> &tensor_shape)
-        : Tensor<ValueType>(tensor_shape), data(std::move(input_data))
-    {
+        : Tensor<ValueType>(tensor_shape), data(std::move(input_data)) {
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
         }
-    
+
         for (size_t i = 1; i < this->rank; i++) {
-            strides[i] = strides[i-1] * this->tensor_shape[i-1];
+            strides[i] = strides[i - 1] * this->tensor_shape[i - 1];
         }
     }
 
     ~ContiguousTensor<ValueType>() override = default;
 
-    void printValue(std::ostream & os, ValueType val) const;
+    void printValue(std::ostream &os, ValueType val) const;
 
     bool operator==(const ContiguousTensor<ValueType> &rhs) {
         if (this->tensor_shape != rhs.tensor_shape) {
             return false;
         }
 
-        return !static_cast<bool>(std::memcmp(data.get(), rhs.data.get(), this->total_element_count * sizeof(ValueType)));
+        return !static_cast<bool>(
+          std::memcmp(data.get(), rhs.data.get(), this->total_element_count * sizeof(ValueType)));
     }
 
-    DenseMatrix<ValueType>* tryToGetDenseMatrix() const {
+    DenseMatrix<ValueType> *tryToGetDenseMatrix() const {
         if (this->rank != 2) {
             return nullptr;
         }
@@ -150,7 +150,7 @@ public:
         if (element_indices.size() != this->rank) {
             return std::nullopt;
         }
-        
+
         if (this->rank == 0) {
             return data.get()[0];
         }
@@ -173,7 +173,7 @@ public:
         if (this->rank == 0) {
             return data.get()[0];
         }
-        
+
         size_t linear_id = element_indices[0];
         for (size_t i = 1; i < this->rank; i++) {
             linear_id += element_indices[i] * strides[i];
@@ -218,7 +218,7 @@ public:
             }
         }
         os << ", " << ValueTypeUtils::cppNameFor<ValueType> << ")" << std::endl;
-    
+
         if (this->rank == 0) {
             os << data.get()[0] << std::endl;
             return;
@@ -234,8 +234,8 @@ public:
         os << std::endl;
     }
 
-    //Ranges are inclusive on both boundaries
-    ContiguousTensor<ValueType>* tryDice(const std::vector<std::pair<size_t, size_t>> &index_ranges) const {
+    // Ranges are inclusive on both boundaries
+    ContiguousTensor<ValueType> *tryDice(const std::vector<std::pair<size_t, size_t>> &index_ranges) const {
         if (index_ranges.size() != this->rank) {
             return nullptr;
         }
@@ -243,7 +243,7 @@ public:
             if (std::get<0>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<1>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<0>(index_ranges[i]) > std::get<1>(index_ranges[i])) {
-                    return nullptr;
+                return nullptr;
             }
         }
 
@@ -253,17 +253,17 @@ public:
             new_tensor_shape[i] = std::get<1>(index_ranges[i]) - std::get<0>(index_ranges[i]) + 1;
         }
 
-        ContiguousTensor<ValueType>* new_tensor = DataObjectFactory::create<ContiguousTensor<ValueType>>(new_tensor_shape, NONE);
+        ContiguousTensor<ValueType> *new_tensor =
+          DataObjectFactory::create<ContiguousTensor<ValueType>>(new_tensor_shape, NONE);
 
         std::vector<size_t> current_indices;
         current_indices.resize(this->rank);
         for (size_t i = 0; i < new_tensor->total_element_count; i++) {
             size_t tmp = i;
 
-            for (int64_t j = this->rank-1; j >= 0; j--) {
-                current_indices[static_cast<size_t>(j)] =
-                    (tmp / new_tensor->strides[static_cast<size_t>(j)]) +
-                    std::get<0>(index_ranges[static_cast<size_t>(j)]);
+            for (int64_t j = this->rank - 1; j >= 0; j--) {
+                current_indices[static_cast<size_t>(j)] = (tmp / new_tensor->strides[static_cast<size_t>(j)]) +
+                                                          std::get<0>(index_ranges[static_cast<size_t>(j)]);
                 tmp = tmp % new_tensor->strides[static_cast<size_t>(j)];
             }
             new_tensor->data[i] = get(current_indices);
@@ -272,7 +272,7 @@ public:
         return new_tensor;
     }
 
-    //Removes all dimensions with a size of 1
+    // Removes all dimensions with a size of 1
     void reduceRank() {
         for (size_t i = 0; i < this->rank; i++) {
             if (this->tensor_shape[i] == 1) {
