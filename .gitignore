@@ -48,7 +48,6 @@ tags.temp
 # compile commands
 compile_commands.json
 
-
 # release scripts output
 /artifacts
 
@@ -65,3 +64,5 @@ precompiled-dependencies/
 
 /compiler-debug-cuda.txt
 /compiler-trace-cuda.txt
+
+/.clang-format
