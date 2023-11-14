@@ -99,23 +99,18 @@ struct IOThreadpool {
 
     std::unique_ptr<std::atomic<IO_STATUS>[]> SubmitWrites(const std::vector<URingWrite> &writes) {
         std::unique_ptr<std::atomic<IO_STATUS>[]> results = std::make_unique<std::atomic<IO_STATUS>[]>(writes.size());
-        std::cout << "S-1" << std::endl;
 
         uint64_t writes_per_ring =
           writes.size() % runners.size() == 0 ? writes.size() / runners.size() : 1 + (writes.size() / runners.size());
-        std::cout << "S-2 " << writes_per_ring << std::endl;
 
         uint64_t current_offset = 0;
         for (size_t i = 0; i < runners.size(); i++) {
             uint64_t current_write_batch =
               (writes.size() - current_offset) > writes_per_ring ? (writes.size() - current_offset) : writes_per_ring;
-            std::cout << "off " << current_offset << " batch " << current_write_batch << std::endl;
             std::vector<URingWriteInternal> ring_write_batch;
             ring_write_batch.resize(current_write_batch);
-            std::cout << "S-3" << std::endl;
-            for (uint64_t j = 0; j < current_write_batch; j++) {
-                std::cout << "S-4" << std::endl;
 
+            for (uint64_t j = 0; j < current_write_batch; j++) {
                 ring_write_batch[j] = {writes[j + current_offset].src,
                                        writes[j + current_offset].src,
                                        writes[j + current_offset].size,
@@ -123,16 +118,11 @@ struct IOThreadpool {
                                        writes[j + current_offset].fd,
                                        &(results[j + current_offset])};
             }
-            std::cout << "S-5" << std::endl;
 
             current_offset += current_write_batch;
 
-            std::cout << "S-6" << std::endl;
-
             runners[i]->ring.Enqueue(ring_write_batch);
-            std::cout << "S-7" << std::endl;
         }
-        std::cout << "S-8" << std::endl;
 
         return results;
     }

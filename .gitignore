@@ -36,3 +36,6 @@ profiler/
 precompiled-dependencies/
 /cmake*/
 /data
+
+/compiler-debug-cuda.txt
+/compiler-trace-cuda.txt

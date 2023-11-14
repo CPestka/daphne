@@ -38,17 +38,9 @@ struct ThreadSafeStack {
         lck.unlock();
     }
     void Push(const std::vector<T> &tasks) {
-        std::cout << "1S " << std::endl;
         lck.lock();
-        std::cout << "2S " << std::endl;
-
-        std::cout << "S " << size << " cap " << capacity << std::endl;
-
         uint64_t current_size = size.load();
         while (current_size + tasks.size() > capacity) {
-            std::cout << "G "
-                      << "S " << size << " cap " << capacity << std::endl;
-
             Grow();
         }
         for (uint64_t i = 0; i < tasks.size(); i++) {
@@ -253,7 +245,7 @@ struct Pool {
         return std::nullopt;
     }
 
-    void Remove(uint64_t id) {
+    void Free(uint64_t id) {
         entry_lcks[id].lock();
         if (is_in_use[id]) {
             currently_occupied_slots--;
@@ -301,7 +293,7 @@ struct Pool {
         return false;
     }
 
-    // For use with T==DataType or with other T that has a mattching == operator
+    // For use with T==DataType or with other T that has a matching == operator
     template<typename T>
     std::optional<DataType> FindAndExtract(T to_find) {
         for (uint64_t i = 0; i < max_size; i++) {
@@ -370,9 +362,12 @@ struct Pool {
         return std::nullopt;
     }
 
-    void free(uint64_t id) {
+    DataType Extract(uint64_t id) {
         entry_lcks[id].lock();
+        DataType tmp  = data[id];
         is_in_use[id] = false;
+        currently_occupied_slots--;
         entry_lcks[id].unlock();
+        return tmp;
     }
 };

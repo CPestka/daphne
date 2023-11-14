@@ -86,7 +86,6 @@ struct URing {
     struct io_uring ring;
     int32_t ring_fd;
 
-    std::atomic<uint64_t> uuid_counter;
     std::atomic<int32_t> remaining_slots;
 
     ThreadSafeStack<URingReadInternal> read_submission_q;
@@ -94,15 +93,13 @@ struct URing {
 
     Pool<InFilghtSQE> in_flight_SQEs;
 
-    // Enqueu(), Submit() to not take any
-
     // ring_size must be <= 32K and will be rounded up to the next power of two
     URing(uint32_t ring_size,
           bool use_io_dev_polling,
           bool use_sq_polling,
           uint32_t submission_queue_idle_timeout_in_ms)
-        : use_io_dev_polling(use_io_dev_polling), use_sq_polling(use_sq_polling), uuid_counter(0),
-          remaining_slots(ring_size), in_flight_SQEs(ring_size) {
+        : use_io_dev_polling(use_io_dev_polling), use_sq_polling(use_sq_polling), remaining_slots(ring_size),
+          in_flight_SQEs(ring_size) {
         std::memset(&ring_para, 0, sizeof(ring_para));
 
         if (use_io_dev_polling) {
@@ -132,6 +129,18 @@ struct URing {
         write_submission_q.Push(writes);
     }
 
+    uint64_t GetUUID(IO_OP_CODE op_code, uint64_t slot_id) {
+        return (slot_id << 8) + static_cast<uint8_t>(op_code);
+    }
+
+    uint64_t GetSlotIdFromUUID(uint64_t uuid) {
+        return uuid >> 8;
+    }
+
+    IO_OP_CODE GetOPCodeFromUUID(uint64_t uuid) {
+        return static_cast<IO_OP_CODE>(static_cast<uint8_t>(uuid & 0xff));
+    }
+
     void SubmitRead() {
         constexpr uint64_t read_batch_size = 64;
 
@@ -139,7 +148,7 @@ struct URing {
         uint64_t amount_of_requests_to_submit = reads.size();
 
         int32_t slots_before_sub = remaining_slots.fetch_sub(amount_of_requests_to_submit);
-        if (slots_before_sub < amount_of_requests_to_submit) {
+        if (slots_before_sub < static_cast<int64_t>(amount_of_requests_to_submit)) {
             if (slots_before_sub < 0) {
                 remaining_slots += amount_of_requests_to_submit;
             } else {
@@ -164,7 +173,8 @@ struct URing {
 
             io_uring_prep_read(sqe, reads[i].fd, reads[i].current_dest, reads[i].remaining_size, reads[i].offset);
 
-            io_uring_sqe_set_data64(sqe, static_cast<__u64>(alloced_slots_for_sqe_meta_data[i]));
+            io_uring_sqe_set_data64(sqe,
+                                    static_cast<__u64>(GetUUID(IO_OP_CODE::READ, alloced_slots_for_sqe_meta_data[i])));
 
             // Workaround for https://github.com/axboe/liburing/issues/88
             // In the case io_uriong_submit() partially or fully succeeds, we can not
@@ -174,7 +184,7 @@ struct URing {
             if (use_sq_polling) {
                 int amount_sqe_submitted = io_uring_submit(&ring);
                 if (amount_sqe_submitted < 0) {
-                    in_flight_SQEs.free(alloced_slots_for_sqe_meta_data[i]);
+                    in_flight_SQEs.Free(alloced_slots_for_sqe_meta_data[i]);
                     break;
                 }
                 requests_submitted++;
@@ -196,7 +206,6 @@ struct URing {
                     }
                     requests_submitted += static_cast<uint32_t>(amount_sqe_submitted);
                     fruitless_attempts = 0;
-                    std::cout << "Submited read" << std::endl;
                 } else {
                     if (amount_sqe_submitted < 0) {
                         break;
@@ -209,6 +218,12 @@ struct URing {
                         continue;
                     }
                 }
+            }
+        }
+
+        if (requests_submitted < amount_of_requests_to_submit) {
+            for (size_t i = requests_submitted; i < amount_of_requests_to_submit; i++) {
+                in_flight_SQEs.Free(alloced_slots_for_sqe_meta_data[i]);
             }
         }
 
@@ -233,7 +248,7 @@ struct URing {
         uint64_t amount_of_requests_to_submit  = writes.size();
 
         int32_t slots_before_sub = remaining_slots.fetch_sub(amount_of_requests_to_submit);
-        if (slots_before_sub < amount_of_requests_to_submit) {
+        if (slots_before_sub < static_cast<int64_t>(amount_of_requests_to_submit)) {
             if (slots_before_sub < 0) {
                 remaining_slots += amount_of_requests_to_submit;
             } else {
@@ -258,7 +273,8 @@ struct URing {
 
             io_uring_prep_write(sqe, writes[i].fd, writes[i].initial_dest, writes[i].remaining_size, writes[i].offset);
 
-            io_uring_sqe_set_data64(sqe, static_cast<__u64>(alloced_slots_for_sqe_meta_data[i]));
+            io_uring_sqe_set_data64(sqe,
+                                    static_cast<__u64>(GetUUID(IO_OP_CODE::WRITE, alloced_slots_for_sqe_meta_data[i])));
 
             // Workaround for https://github.com/axboe/liburing/issues/88
             // In the case io_uriong_submit() partially or fully succeeds, we can not
@@ -268,6 +284,7 @@ struct URing {
             if (use_sq_polling) {
                 int amount_sqe_submitted = io_uring_submit(&ring);
                 if (amount_sqe_submitted < 0) {
+                    in_flight_SQEs.Free(alloced_slots_for_sqe_meta_data[i]);
                     break;
                 }
                 requests_submitted++;
@@ -289,7 +306,6 @@ struct URing {
                     }
                     requests_submitted += static_cast<uint32_t>(amount_sqe_submitted);
                     fruitless_attempts = 0;
-                    std::cout << "Submited write" << std::endl;
                 } else {
                     if (amount_sqe_submitted < 0) {
                         break;
@@ -302,6 +318,12 @@ struct URing {
                         continue;
                     }
                 }
+            }
+        }
+
+        if (requests_submitted < amount_of_requests_to_submit) {
+            for (size_t i = requests_submitted; i < amount_of_requests_to_submit; i++) {
+                in_flight_SQEs.Free(alloced_slots_for_sqe_meta_data[i]);
             }
         }
 
@@ -319,13 +341,15 @@ struct URing {
         }
     }
 
-    void HandleRead(InFilghtSQE in_flight_request, int32_t cqe_res) {
+    void HandleRead(uint64_t slot_id, int32_t cqe_res) {
+        InFilghtSQE in_flight_request = in_flight_SQEs.Extract(slot_id);
+
         URingReadResult *result = static_cast<URingReadResult *>(in_flight_request.result);
 
         // Either request fully or partially fullfilled
         if (cqe_res > 0) {
             // partial read -> not a failure -> resubmit modified request
-            if (cqe_res < in_flight_request.remaining_size) {
+            if (static_cast<uint32_t>(cqe_res) < in_flight_request.remaining_size) {
                 read_submission_q.Push({in_flight_request.initial,
                                         (static_cast<uint8_t *>(in_flight_request.current) + cqe_res),
                                         in_flight_request.remaining_size - cqe_res,
@@ -356,13 +380,14 @@ struct URing {
         }
     }
 
-    void HandleWrite(InFilghtSQE in_flight_request, int32_t cqe_res) {
+    void HandleWrite(uint64_t slot_id, int32_t cqe_res) {
+        InFilghtSQE in_flight_request  = in_flight_SQEs.Extract(slot_id);
         std::atomic<IO_STATUS> *result = static_cast<std::atomic<IO_STATUS> *>(in_flight_request.result);
 
         // Either request fully or partially fullfilled
         if (cqe_res > 0) {
             // partial write -> not a failure -> resubmit modified request
-            if (cqe_res < in_flight_request.remaining_size) {
+            if (static_cast<uint32_t>(cqe_res) < in_flight_request.remaining_size) {
                 write_submission_q.Push({in_flight_request.initial,
                                          (static_cast<uint8_t *>(in_flight_request.current) + cqe_res),
                                          in_flight_request.remaining_size - cqe_res,
@@ -407,22 +432,15 @@ struct URing {
         uint32_t amount_of_fullfilled_requests = io_uring_peek_batch_cqe(&ring, cqes, peek_batch_size);
 
         for (int32_t i = 0; i < static_cast<int32_t>(amount_of_fullfilled_requests); i++) {
-            IO_OP_CODE current_io_op                     = GetIOOPCodeFromUUID(cqes[i]->user_data);
-            std::optional<InFilghtSQE> in_flight_request = in_flight_SQEs.FindAndExtractUUID(cqes[i]->user_data);
+            uint64_t slot_id   = GetSlotIdFromUUID(cqes[i]->user_data);
+            IO_OP_CODE op_code = GetOPCodeFromUUID(cqes[i]->user_data);
 
-            if (!in_flight_request) {    // submitted to io_uring but not yet inserted
-                                         // into in_flight_SQEs -> retry
-                i--;
-                continue;
-            }
-            std::cout << "Let s handle em" << std::endl;
-
-            switch (current_io_op) {
+            switch (op_code) {
                 case IO_OP_CODE::READ:
-                    HandleRead(in_flight_request.value(), cqes[i]->res);
+                    HandleRead(slot_id, cqes[i]->res);
                     break;
                 case IO_OP_CODE::WRITE:
-                    HandleWrite(in_flight_request.value(), cqes[i]->res);
+                    HandleWrite(slot_id, cqes[i]->res);
                     break;
             }
         }

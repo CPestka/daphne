@@ -37,10 +37,9 @@ TEST_CASE("io_uring / io threadpool setup Tests", TAG_IO) {
 }
 
 TEST_CASE("io_uring basic File R/W test", TAG_IO) {
-    std::cout << "Hello" << std::endl;
     IOThreadpool io_pool(1, 64, false, false, 1000);
 
-    int fd = open("./uring_test_tmp", O_CREAT | O_RDWR | O_DIRECT | O_TRUNC, S_IRUSR | S_IWUSR);
+    int fd = open("./test/runtime/local/io/uring_test_tmp", O_CREAT | O_RDWR | O_DIRECT | O_TRUNC, S_IRUSR | S_IWUSR);
     REQUIRE(fd > 0);
 
     auto data_page   = std::make_unique<uint64_t[]>(4096 / sizeof(uint64_t));
@@ -58,27 +57,36 @@ TEST_CASE("io_uring basic File R/W test", TAG_IO) {
 
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
+    bool timed_out = false;
     while (write_future[0] == IO_STATUS::IN_FLIGHT) {
-        REQUIRE(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                        std::chrono::high_resolution_clock::now() - start)
-                                        .count()) < 20000);
+        if (static_cast<uint64_t>(
+              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+                .count()) > 3000) {
+            timed_out = true;
+            break;
+        }
     }
+    REQUIRE(!timed_out);
 
     REQUIRE(write_future[0] == IO_STATUS::SUCCESS);
 
     // The Read
     std::vector<URingRead> read_requests;
-    write_requests.push_back({result_page.get(), 4096, 0, fd});
+    read_requests.push_back({result_page.get(), 4096, 0, fd});
 
     std::unique_ptr<URingReadResult[]> read_future = io_pool.SubmitReads(read_requests);
 
-    start = std::chrono::high_resolution_clock::now();
-
+    timed_out = false;
+    start     = std::chrono::high_resolution_clock::now();
     while (read_future[0].status == IO_STATUS::IN_FLIGHT) {
-        REQUIRE(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                        std::chrono::high_resolution_clock::now() - start)
-                                        .count()) < 20000);
+        if (static_cast<uint64_t>(
+              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+                .count()) > 3000) {
+            timed_out = true;
+            break;
+        }
     }
+    REQUIRE(!timed_out);
 
     REQUIRE(read_future[0].status == IO_STATUS::SUCCESS);
 
