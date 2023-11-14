@@ -2170,6 +2170,15 @@
             [["CSRMatrix", "float"]],
             [["CSRMatrix", "int64_t"]],
             [["CSRMatrix", "uint8_t"]],
+            [["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "int8_t"]],
+            [["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "size_t"]],
             ["Frame"],
             ["char"]
         ]
@@ -2226,6 +2235,60 @@
             [["DenseMatrix", "int64_t"], "int64_t"],
             [["DenseMatrix", "uint8_t"], "uint8_t"],
             [["CSRMatrix", "double"], "double"]
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "RandTensor.h",
+            "opName": "randTensor3D",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "VTArg",
+                    "isDataType": false
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "DTRes *&",
+                    "name": "res"
+                },
+                {
+                    "type": "size_t",
+                    "name": "numX"
+                },
+                {
+                    "type": "size_t",
+                    "name": "numY"
+                },
+                {
+                    "type": "size_t",
+                    "name": "numZ"
+                },
+                {
+                    "type": "VTArg",
+                    "name": "min"
+                },
+                {
+                    "type": "VTArg",
+                    "name": "max"
+                }
+            ]
+        },
+        "instantiations": [
+            [["ContiguousTensor", "double"], "double"],
+            [["ContiguousTensor", "float"], "float"],
+            [["ContiguousTensor", "int64_t"], "int64_t"],
+            [["ContiguousTensor", "int32_t"], "int32_t"],
+            [["ContiguousTensor", "int8_t"], "int8_t"],
+            [["ContiguousTensor", "uint64_t"], "uint64_t"],
+            [["ContiguousTensor", "uint32_t"], "uint32_t"],
+            [["ContiguousTensor", "uint8_t"], "uint8_t"],
+            [["ContiguousTensor", "size_t"], "size_t"]
         ]
     },
     {
@@ -2785,6 +2848,23 @@
         "kernelTemplate": {
             "header": "NumCells.h",
             "opName": "numCells",
+            "returnType": "size_t",
+            "templateParams": [],
+            "runtimeParams": [
+                {
+                    "type": "const Structure *",
+                    "name": "arg"
+                }
+            ]
+        },
+        "instantiations": [
+            []
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "NumDims.h",
+            "opName": "numDims",
             "returnType": "size_t",
             "templateParams": [],
             "runtimeParams": [

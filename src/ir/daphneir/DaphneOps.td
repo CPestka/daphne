@@ -139,6 +139,15 @@ def Daphne_RandMatrixOp : Daphne_Op<"randMatrix", [
     let results = (outs MatrixOrU:$res);
 }
 
+def Daphne_RandTensor3DOp : Daphne_Op<"randTensor3D", [
+    TypesMatchWith<"min and max arguments must be of the same type", "min", "max", "$_self">,
+    NumRowsFromIthScalar<0>, NumColsFromIthScalar<1>, NumRowsFromIthScalar<2>, DeclareOpInterfaceMethods<InferTypesOpInterface>,
+    SparsityFromIthScalar<4>, CastArgsToResTypeRandTensor3DOp
+]> {
+    let arguments = (ins Size:$numX, Size:$numY, Size:$numZ, AnyScalar:$min, AnyScalar:$max);
+    let results = (outs TensorOrU:$res);
+}
+
 def Daphne_SampleOp : Daphne_Op<"sample", [
     DataTypeMat, ValueTypeFromFirstArg,
     NumRowsFromIthScalar<1>, OneCol
@@ -164,7 +173,7 @@ def Daphne_SeqOp : Daphne_Op<"seq", [
 class Daphne_NumOp<string name, list<Trait> traits = []> : Daphne_Op<name, !listconcat(traits, [
     DataTypeSca, ValueTypeSize, Pure
 ])> {
-    let arguments = (ins MatrixOrFrame:$arg);
+    let arguments = (ins MatrixOrFrameOrTensor:$arg);
     let results = (outs Size:$res);
 
     let hasCanonicalizeMethod = 1;
@@ -173,6 +182,7 @@ class Daphne_NumOp<string name, list<Trait> traits = []> : Daphne_Op<name, !list
 def Daphne_NumRowsOp : Daphne_NumOp<"numRows">;
 def Daphne_NumColsOp : Daphne_NumOp<"numCols">;
 def Daphne_NumCellsOp : Daphne_NumOp<"numCells">;
+def Daphne_NumDimsOp : Daphne_NumOp<"numDims">;
 
 // ****************************************************************************
 // Matrix multiplication
@@ -1320,7 +1330,7 @@ def Daphne_PrintOp : Daphne_Op<"print"> {
     // TODO We might change it to only accept scalars here and enforce toString
     // for matrices and frames. But currently, we need it like that for the
     // rest of the program.
-    let arguments = (ins AnyTypeOf<[AnyScalar, MatrixOrFrame, AnyMemRef, Unknown]>:$arg, BoolScalar:$newline, BoolScalar:$err);
+    let arguments = (ins AnyTypeOf<[AnyScalar, MatrixOrFrameOrTensor, Unknown]>:$arg, BoolScalar:$newline, BoolScalar:$err);
     let results = (outs); // no results
 }
 

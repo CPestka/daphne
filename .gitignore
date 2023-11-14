@@ -62,3 +62,6 @@ precompiled-dependencies/
 # Allow .daphne and .mlir files in test/
 !test/**/*.mlir
 !test/**/*.daphne
+
+/compiler-debug-cuda.txt
+/compiler-trace-cuda.txt

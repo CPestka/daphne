@@ -14,14 +14,18 @@
  * limitations under the License.
  */
 
-#ifndef SRC_IR_DAPHNEIR_DAPHNETYPEADAPTATIONTRAITS_TD
-#define SRC_IR_DAPHNEIR_DAPHNETYPEADAPTATIONTRAITS_TD
+#ifndef SRC_RUNTIME_LOCAL_KERNELS_NUMDIMS_H
+#define SRC_RUNTIME_LOCAL_KERNELS_NUMDIMS_H
 
-include "mlir/IR/OpBase.td"
+#include <runtime/local/context/DaphneContext.h>
+#include <runtime/local/datastructures/Structure.h>
 
-def CastArgsToResType: NativeOpTrait<"CastArgsToResType">;
-def CastFirstTwoArgsToResType: NativeOpTrait<"CastFirstTwoArgsToResType">;
-def CastArgsToResTypeRandMatrixOp: NativeOpTrait<"CastArgsToResTypeRandMatrixOp">;
-def CastArgsToResTypeRandTensor3DOp: NativeOpTrait<"CastArgsToResTypeRandTensor3DOp">;
+// ****************************************************************************
+// Convenience function
+// ****************************************************************************
 
-#endif //SRC_IR_DAPHNEIR_DAPHNETYPEADAPTATIONTRAITS_TD
+size_t numDims(const Structure * arg, DCTX(ctx)) {
+    return arg->getNumCols() * arg->getNumRows();
+}
+
+#endif //SRC_RUNTIME_LOCAL_KERNELS_NUMDIMS_H
