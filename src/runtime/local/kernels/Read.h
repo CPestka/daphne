@@ -21,11 +21,13 @@
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Frame.h>
+#include <runtime/local/datastructures/ContiguousTensor.h>
 #include <runtime/local/io/File.h>
 #include <runtime/local/io/ReadCsv.h>
 #include <runtime/local/io/ReadMM.h>
 #include <runtime/local/io/ReadParquet.h>
 #include <runtime/local/io/ReadDaphne.h>
+#include <runtime/local/io/ReadZarr.h>
 #include <parser/metadata/MetaDataParser.h>
 
 #include <string>
@@ -39,6 +41,7 @@ struct FileExt {
 		m["mtx"] = 1;
 		m["parquet"] = 2;
 		m["dbdf"] = 3;
+        m["zarr"] = 4;
 		return m;
 	}
 	static const std::map<std::string, int> map;
@@ -181,6 +184,23 @@ struct Read<Frame> {
     }
 };
 
+// ----------------------------------------------------------------------------
+// ContiguousTensor
+// ----------------------------------------------------------------------------
+
+template<typename VT>
+struct Read<ContiguousTensor<VT>> {
+    static void apply(ContiguousTensor<VT> *& res, const char * filename, DCTX(ctx)) {
+        int extv = extValue(filename);
+        switch(extv) {
+            case 4:
+                readZarr(res, filename);
+                break;
+            default:
+                throw std::runtime_error("File extension not supported");
+        }
+    }
+};
 
 inline int extValue(const char * filename) {
 	int extv;

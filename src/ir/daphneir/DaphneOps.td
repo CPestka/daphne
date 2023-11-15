@@ -1343,7 +1343,7 @@ def Daphne_ReadOp : Daphne_Op<"read", [
 ]> {
     // TODO We might add arguments for a UDF later.
     let arguments = (ins StrScalar:$fileName);
-    let results = (outs MatrixOrFrame:$res);
+    let results = (outs MatrixOrFrameOrTensor:$res);
 }
 
 def Daphne_WriteOp : Daphne_Op<"write"> {

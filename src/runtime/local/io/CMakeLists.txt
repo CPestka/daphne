@@ -14,5 +14,6 @@
 
 add_library(IO
         utils.cpp
+        ZarrFileMetadata.cpp
 )
 target_link_libraries(IO)

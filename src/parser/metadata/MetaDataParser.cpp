@@ -16,7 +16,7 @@
 
 #include <parser/metadata/MetaDataParser.h>
 #include <parser/metadata/JsonKeys.h>
-
+#include <iostream>
 #include <fstream>
 
 FileMetaData MetaDataParser::readMetaData(const std::string& filename_) {
@@ -26,6 +26,10 @@ FileMetaData MetaDataParser::readMetaData(const std::string& filename_) {
         throw std::runtime_error("Could not open file '" + metaFilename + "' for reading meta data.");
 
     nlohmann::json jf = nlohmann::json::parse(ifs);
+
+    if (keyExists(jf, JsonKeys::EXTERNAL) && keyExists(jf, JsonKeys::FILE_TYPE)) {
+        return {jf.at(JsonKeys::FILE_TYPE).get<std::string>(), jf.at(JsonKeys::EXTERNAL).get<bool>()};
+    }
 
     if (!keyExists(jf, JsonKeys::NUM_ROWS) || !keyExists(jf, JsonKeys::NUM_COLS)) {
         throw std::invalid_argument("A meta data JSON file should always contain \"" + JsonKeys::NUM_ROWS + "\" and \""

@@ -1037,6 +1037,12 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
         return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0]));
     }
 
+    if (func == "readTensor") {
+        checkNumArgsExact(func, numArgs, 1);
+        mlir::Type resType = mlir::daphne::TensorType::get(builder.getContext(), {utils.unknownType});
+        return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0]));
+    }
+
     if(func == "writeFrame" || func == "writeMatrix" || func == "write") {
         // Note that the type of arg already indicates if it is a frame or a
         // matrix.

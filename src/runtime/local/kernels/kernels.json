@@ -2393,6 +2393,15 @@
             [["DenseMatrix", "int64_t"]],
             [["DenseMatrix", "uint8_t"]],
             [["CSRMatrix", "double"]],
+            [["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "int8_t"]],
+            [["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "size_t"]],
             ["Frame"]
         ]
     },

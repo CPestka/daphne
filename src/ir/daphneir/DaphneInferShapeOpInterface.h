@@ -150,7 +150,7 @@ namespace mlir::daphne {
  * operation. A value of -1 for any of the numbers of rows or columns indicates
  * that this number is not known (yet).
  */
-std::vector<std::pair<ssize_t, ssize_t>> tryInferShape(mlir::Operation* op);
+std::vector<std::vector<ssize_t>> tryInferShape(mlir::Operation* op);
 }
 
 #endif // SRC_IR_DAPHNEIR_DAPHNEINFERSHAPEOPINTERFACE_H

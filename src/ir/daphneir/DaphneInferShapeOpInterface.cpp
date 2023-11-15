@@ -17,6 +17,8 @@
 #include <compiler/utils/CompilerUtils.h>
 #include <ir/daphneir/Daphne.h>
 #include <runtime/local/datastructures/Structure.h>
+#include <parser/metadata/ZarrFileMetaDataParser.h>
+#include <runtime/local/io/ZarrFileMetadata.h>
 
 #include <mlir/IR/Value.h>
 
@@ -171,24 +173,24 @@ ssize_t daphne::SeqOp::inferNumRows() {
     );
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::CreateFrameOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::CreateFrameOp::inferShape() {
     return {{inferNumRowsFromArgs(getCols()), inferNumColsFromSumOfArgs(getCols())}};
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::GroupJoinOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::GroupJoinOp::inferShape() {
     // We don't know the exact numbers of rows here, but we know the numbers of
     // columns.
     return {{-1, 2}, {-1, 1}};
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::GroupOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::GroupOp::inferShape() {
     // We don't know the exact number of groups here.
-    const size_t numRows = -1;
-    const size_t numCols = getKeyCol().size() + getAggCol().size();
+    const ssize_t numRows = -1;
+    const ssize_t numCols = getKeyCol().size() + getAggCol().size();
     return {{numRows, numCols}};
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::MatMulOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::MatMulOp::inferShape() {
     auto shapeLhs = getShape(getLhs());
     auto shapeRhs = getShape(getRhs());
 
@@ -205,19 +207,41 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::MatMulOp::inferShape() {
     return {{numRows, numCols}};
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::ReadOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::ReadOp::inferShape() {
     auto p = CompilerUtils::isConstant<std::string>(getFileName());
-    if (p.first) {
-        FileMetaData fmd = CompilerUtils::getFileMetaData(getFileName());
-        return {{fmd.numRows, fmd.numCols}};
-    } else {
-        return {{-1, -1}};
+    Type t = getRes().getType();
+    if (t.dyn_cast<daphne::MatrixType>() || t.dyn_cast<daphne::FrameType>()) {
+        if (p.first) {
+            FileMetaData fmd = CompilerUtils::getFileMetaData(getFileName());
+            return {{static_cast<ssize_t>(fmd.numRows), static_cast<ssize_t>(fmd.numCols)}};
+        } else {
+            return {{-1, -1}};
+        }
+    }
+    if (t.dyn_cast<daphne::TensorType>()) {
+        if (p.first) {
+            FileMetaData fmd = CompilerUtils::getFileMetaData(getFileName());
+            if (fmd.external) {
+                auto fmd = ZarrFileMetaDataParser::readMetaData(CompilerUtils::constantOrThrow<std::string>(getFileName()));
+                std::vector<std::vector<ssize_t>> tmp1;
+                std::vector<ssize_t> tmp2;
+                for (const auto& e : fmd.shape) {
+                    tmp2.push_back(e);
+                }
+                tmp1.push_back(tmp2);
+                return tmp1;
+            } else {
+                return {{static_cast<ssize_t>(fmd.numRows), static_cast<ssize_t>(fmd.numCols), static_cast<ssize_t>(fmd.numCols)}};
+            }
+        } else {
+            return {{-1, -1, -1}};
+        }
     }
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::OrderOp::inferShape() {
-    size_t numRows = -1;
-    size_t numCols = -1;
+std::vector<std::vector<ssize_t>> daphne::OrderOp::inferShape() {
+    ssize_t numRows = -1;
+    ssize_t numCols = -1;
 
     Type t = getArg().getType();
     if(auto mt = t.dyn_cast<daphne::MatrixType>()){
@@ -239,7 +263,7 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::OrderOp::inferShape() {
     return {{numRows, numCols}};
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::CondOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::CondOp::inferShape() {
     Type condTy = getCond().getType();
     if(condTy.isa<daphne::UnknownType>())
         // Actually, this should not happen, because if the type of the
@@ -292,7 +316,7 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::CondOp::inferShape() {
     }
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::CTableOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::CTableOp::inferShape() {
     // If the result shape is given as arguments, then we know it.
     // Otherwise, we don't.
     // TODO In case resNumRows/resNumCols are known to be -1 (i.e., if
@@ -306,12 +330,12 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::CTableOp::inferShape() {
     }};
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::MatrixConstantOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::MatrixConstantOp::inferShape() {
     const Structure* mat = reinterpret_cast<const Structure*>(CompilerUtils::constantOrThrow<uint64_t>(getMatrixAddr()));
-    return {{mat->getNumRows(), mat->getNumCols()}};
+    return {{static_cast<ssize_t>(mat->getNumRows()), static_cast<ssize_t>(mat->getNumCols())}};
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::SliceRowOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::SliceRowOp::inferShape() {
     Type srcTy = getSource().getType();
     ssize_t srcNumRows;
     ssize_t srcNumCols;
@@ -359,7 +383,7 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::SliceRowOp::inferShape() {
     return {{resNumRows, srcNumCols}};
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::SliceColOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::SliceColOp::inferShape() {
     Type srcTy = getSource().getType();
     ssize_t srcNumRows;
     ssize_t srcNumCols;
@@ -407,7 +431,7 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::SliceColOp::inferShape() {
     return {{srcNumRows, resNumCols}};
 }
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::EigenOp::inferShape() {
+std::vector<std::vector<ssize_t>> daphne::EigenOp::inferShape() {
     auto shape = getShape(getOperand());
     return {{shape.first, 1}, {shape.first, shape.first}};
 }
@@ -494,7 +518,7 @@ struct tryShapeFromIthArg {
 // Shape inference function
 // ****************************************************************************
 
-std::vector<std::pair<ssize_t, ssize_t>> daphne::tryInferShape(Operation* op) {
+std::vector<std::vector<ssize_t>> daphne::tryInferShape(Operation* op) {
     if(auto inferShapeOp = llvm::dyn_cast<daphne::InferShape>(op))
         // If the operation implements the shape inference interface,
         // we apply that.
@@ -568,9 +592,9 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::tryInferShape(Operation* op) {
     else {
         // If the operation does not implement the shape inference interface
         // and has zero or more than one results, we return unknown.
-        std::vector<std::pair<ssize_t, ssize_t>> shapes;
-        for(size_t i = 0; i < op->getNumResults(); i++)
-            shapes.push_back({-1, -1});
-        return shapes;
+        // std::vector<std::pair<ssize_t, ssize_t>> shapes;
+        // for(size_t i = 0; i < op->getNumResults(); i++)
+        //     shapes.push_back({-1, -1});
+        // return shapes;
     }
 }

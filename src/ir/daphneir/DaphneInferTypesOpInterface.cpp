@@ -17,6 +17,8 @@
 #include <compiler/utils/CompilerUtils.h>
 #include <compiler/utils/TypePrinting.h>
 #include <ir/daphneir/Daphne.h>
+#include <parser/metadata/ZarrFileMetaDataParser.h>
+#include <runtime/local/io/ZarrFileMetadata.h>
 
 #include <spdlog/spdlog.h>
 
@@ -308,6 +310,15 @@ mlir::Type mlirTypeForCode(ValueTypeCode type, Builder builder) {
     }
 }
 
+mlir::Type mlirTypeForCode(ZarrDatatype type, Builder builder) {
+    switch(type) {
+        case ZarrDatatype::INTEGER: return builder.getIntegerType(32, true);
+        case ZarrDatatype::UINTEGER: return builder.getIntegerType(64, false);
+        case ZarrDatatype::FLOATING: return builder.getF32Type();
+        default: throw std::runtime_error("mlirTypeForCode: unknown value type code");
+    }
+}
+
 std::vector<Type> daphne::ReadOp::inferTypes() {
 
     auto p = CompilerUtils::isConstant<std::string>(getFileName());
@@ -342,6 +353,21 @@ std::vector<Type> daphne::ReadOp::inferTypes() {
             return {mlir::daphne::FrameType::get(builder.getContext(), cts)};
         } else {
             return {mlir::daphne::FrameType::get(builder.getContext(), {daphne::UnknownType::get(getContext())})};
+        }
+    }
+    else if (auto resType = getRes().getType().dyn_cast<daphne::TensorType>()) {
+        if (p.first) {
+            FileMetaData fmd = CompilerUtils::getFileMetaData(getFileName());
+            if (fmd.external) {
+                auto fmd = ZarrFileMetaDataParser::readMetaData(CompilerUtils::constantOrThrow<std::string>(getFileName()));
+                mlir::Type valType = mlirTypeForCode(fmd.data_type, builder);
+                return {mlir::daphne::TensorType::get(getContext(), valType)};
+            } else {
+                mlir::Type valType = mlirTypeForCode(fmd.schema[0], builder);
+                return {mlir::daphne::TensorType::get(getContext(), valType)};
+            }
+        } else {
+            return {mlir::daphne::TensorType::get(getContext(), daphne::UnknownType::get(getContext()))};
         }
     }
     return {daphne::UnknownType::get(getContext())};

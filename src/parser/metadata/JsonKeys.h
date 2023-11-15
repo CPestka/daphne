@@ -36,6 +36,8 @@ struct JsonKeys {
 
     // optional key
     inline static const std::string NUM_NON_ZEROS = "numNonZeros";  // int (default: -1)
+    inline static const std::string FILE_TYPE = "fileType";
+    inline static const std::string EXTERNAL = "external";
 };
 
 #endif

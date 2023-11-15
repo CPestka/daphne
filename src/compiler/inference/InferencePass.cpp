@@ -147,6 +147,8 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                 t = mt.withSameElementType();
             else if(auto ft = t.dyn_cast<daphne::FrameType>())
                 t = ft.withSameColumnTypes();
+            else if(auto tt = t.dyn_cast<daphne::TensorType>())
+                t = tt.withSameElementType();
             op->getResult(i).setType(t);
         }
         return WalkResult::advance();
@@ -177,7 +179,7 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
             if(!isScfOp) {
                 if (doShapeInference) {
                     // Try to infer the shapes of all results of this operation.
-                    std::vector<std::pair<ssize_t, ssize_t>> shapes = daphne::tryInferShape(op);
+                    auto shapes = daphne::tryInferShape(op);
                     const size_t numRes = op->getNumResults();
                     if(shapes.size() != numRes)
                         throw std::runtime_error(
@@ -192,8 +194,8 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                             op->getResultTypes()[i].isa<mlir::daphne::MatrixType>() ||
                             op->getResultTypes()[i].isa<mlir::daphne::FrameType>()
                         ) {
-                            const ssize_t numRows = shapes[i].first;
-                            const ssize_t numCols = shapes[i].second;
+                            const ssize_t numRows = (shapes[i])[0];
+                            const ssize_t numCols = (shapes[i])[1];
                             Value rv = op->getResult(i);
                             const Type rt = rv.getType();
                             if (auto mt = rt.dyn_cast<daphne::MatrixType>())
@@ -209,13 +211,14 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                                 );
                         }
                         else if(op->getResultTypes()[i].isa<mlir::daphne::TensorType>()) {
-                            const ssize_t numRows = shapes[i].first;
-                            const ssize_t numCols = shapes[i].second;
+                            const ssize_t numX = (shapes[i])[0];
+                            const ssize_t numY = (shapes[i])[1];
+                            const ssize_t numZ = (shapes[i])[2];
                             Value rv = op->getResult(i);
                             const Type rt = rv.getType();
                             if (auto tt = rt.dyn_cast<daphne::TensorType>()) {
                                 // ToDo(fixme): currently, the shape can only be inferred for up to two dimensions!
-                                rv.setType(tt.withShape(numRows, numCols, numCols));
+                                rv.setType(tt.withShape(numX, numY, numZ));
                             }
                         }
                     }
@@ -501,6 +504,9 @@ public:
                 for(Type ct : ft.getColumnTypes())
                     if(ct.isa<daphne::UnknownType>())
                         return true;
+            if (auto tt = resType.dyn_cast<daphne::TensorType>()) {
+                return tt.getElementType().isa<daphne::UnknownType>();
+            }
             return false;
         });
     }

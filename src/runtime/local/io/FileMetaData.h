@@ -34,6 +34,8 @@ struct FileMetaData {
     std::vector<ValueTypeCode> schema;
     std::vector<std::string> labels;
     const ssize_t numNonZeros;
+    std::string fileType;
+    bool external;
     
     /**
      * @brief Construct a new File Meta Data object for Frames
@@ -44,13 +46,17 @@ struct FileMetaData {
         bool isSingleValueType,
         std::vector<ValueTypeCode> schema,
         std::vector<std::string> labels,
-        ssize_t numNonZeros = -1
+        ssize_t numNonZeros = -1.,
+        std::string fileType = "",
+        bool external = false
     ) :
         numRows(numRows), numCols(numCols),
         isSingleValueType(isSingleValueType),
         schema(std::move(schema)),
         labels(std::move(labels)),
-        numNonZeros(numNonZeros) {}
+        numNonZeros(numNonZeros),
+        fileType(fileType),
+        external(external) {}
 
     /**
      * @brief Construct a new File Meta Data object for Matrix
@@ -60,12 +66,21 @@ struct FileMetaData {
         size_t numCols,
         bool isSingleValueType,
         ValueTypeCode valueType,
-        ssize_t numNonZeros = -1
+        ssize_t numNonZeros = -1,
+        std::string fileType = "",
+        bool external = false
     ) :
         numRows(numRows), numCols(numCols),
         isSingleValueType(isSingleValueType),
-        numNonZeros(numNonZeros)
+        numNonZeros(numNonZeros),
+        fileType(fileType),
+        external(external)
     {
         schema.emplace_back(valueType);
     }
+
+        /**
+     * @brief Construct a new File Meta Data object for external metadata files
+     */
+    FileMetaData(std::string fileType, bool external) : numRows(0), numCols(0), isSingleValueType(true), numNonZeros(-1), fileType(fileType), external(external) {}
 };
