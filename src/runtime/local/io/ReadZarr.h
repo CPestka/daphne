@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <runtime/local/datastructures/ContiguousTensor.h>
+#include <runtime/local/datastructures/ChunkedTensor.h>
 #include <runtime/local/io/ZarrFileMetadata.h>
 #include <parser/metadata/ZarrFileMetaDataParser.h>
 
@@ -42,6 +43,19 @@ struct ReadZarr<ContiguousTensor<VT>> {
     static void apply(ContiguousTensor<VT> *&res, const char *filename) {
         auto fmd = ZarrFileMetaDataParser::readMetaData(filename);
         res = DataObjectFactory::create<ContiguousTensor<VT>>(fmd.shape, InitCode::NONE);
+
+        // now do the actual reading part
+        auto dimension_separator = fmd.dimension_separator;
+
+        auto byte_order = fmd.byte_order;
+    }
+};
+
+template <typename VT>
+struct ReadZarr<ChunkedTensor<VT>> {
+    static void apply(ChunkedTensor<VT> *&res, const char *filename) {
+        auto fmd = ZarrFileMetaDataParser::readMetaData(filename);
+        res = DataObjectFactory::create<ChunkedTensor<VT>>(fmd.shape, fmd.chunks, InitCode::NONE);
 
         // now do the actual reading part
         auto dimension_separator = fmd.dimension_separator;

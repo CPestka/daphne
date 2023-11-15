@@ -22,6 +22,7 @@
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Frame.h>
 #include <runtime/local/datastructures/ContiguousTensor.h>
+#include <runtime/local/datastructures/ChunkedTensor.h>
 #include <runtime/local/io/File.h>
 #include <runtime/local/io/ReadCsv.h>
 #include <runtime/local/io/ReadMM.h>
@@ -187,10 +188,26 @@ struct Read<Frame> {
 // ----------------------------------------------------------------------------
 // ContiguousTensor
 // ----------------------------------------------------------------------------
-
 template<typename VT>
 struct Read<ContiguousTensor<VT>> {
     static void apply(ContiguousTensor<VT> *& res, const char * filename, DCTX(ctx)) {
+        int extv = extValue(filename);
+        switch(extv) {
+            case 4:
+                readZarr(res, filename);
+                break;
+            default:
+                throw std::runtime_error("File extension not supported");
+        }
+    }
+};
+
+// ----------------------------------------------------------------------------
+// ChunkedTensor
+// ----------------------------------------------------------------------------
+template<typename VT>
+struct Read<ChunkedTensor<VT>> {
+    static void apply(ChunkedTensor<VT> *& res, const char * filename, DCTX(ctx)) {
         int extv = extValue(filename);
         switch(extv) {
             case 4:
