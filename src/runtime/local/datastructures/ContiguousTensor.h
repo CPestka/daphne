@@ -37,8 +37,8 @@ class ContiguousTensor : public Tensor<ValueType> {
 
     std::shared_ptr<ValueType[]> data;
 
-    ContiguousTensor<ValueType>(const std::vector<size_t> &tensor_shape, InitCode init_code)
-        : Tensor<ValueType>(tensor_shape),
+    ContiguousTensor(const std::vector<size_t> &tensor_shape, InitCode init_code)
+        : Tensor<ValueType>::Tensor(tensor_shape),
           data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>()) {
         spdlog::info("ContiguousTensor creation");
         strides.resize(this->rank);
@@ -88,17 +88,17 @@ class ContiguousTensor : public Tensor<ValueType> {
         }
     };
 
-    ContiguousTensor<ValueType>(ContiguousTensor<ValueType> *other)
-        : Tensor<ValueType>(other->tensor_shape), strides(other->strides), data(other->data) {};
+    ContiguousTensor(ContiguousTensor<ValueType> *other)
+        : Tensor<ValueType>::Tensor(other->tensor_shape), strides(other->strides), data(other->data) {};
 
-    ContiguousTensor<ValueType>(DenseMatrix<ValueType> *other)
-        : Tensor<ValueType>(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
+    ContiguousTensor(DenseMatrix<ValueType> *other)
+        : Tensor<ValueType>::Tensor(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
         strides = {1, other->getNumCols()};
     }
 
     // Copies passed data
-    ContiguousTensor<ValueType>(ValueType *input_data, const std::vector<size_t> &tensor_shape)
-        : Tensor<ValueType>(tensor_shape),
+    ContiguousTensor(ValueType *input_data, const std::vector<size_t> &tensor_shape)
+        : Tensor<ValueType>::Tensor(tensor_shape),
           data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>()) {
         strides.resize(this->rank);
         if (this->rank > 0) {
@@ -113,8 +113,8 @@ class ContiguousTensor : public Tensor<ValueType> {
     }
 
     // Takes ownership of data
-    ContiguousTensor<ValueType>(std::unique_ptr<ValueType[]> input_data, const std::vector<size_t> &tensor_shape)
-        : Tensor<ValueType>(tensor_shape), data(std::move(input_data)) {
+    ContiguousTensor(std::unique_ptr<ValueType[]> input_data, const std::vector<size_t> &tensor_shape)
+        : Tensor<ValueType>::Tensor(tensor_shape), data(std::move(input_data)) {
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
@@ -125,7 +125,7 @@ class ContiguousTensor : public Tensor<ValueType> {
         }
     }
 
-    ~ContiguousTensor<ValueType>() override = default;
+    ~ContiguousTensor() override = default;
 
     void printValue(std::ostream &os, ValueType val) const;
 
