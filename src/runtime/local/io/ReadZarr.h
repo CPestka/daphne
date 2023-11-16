@@ -23,6 +23,7 @@
 #include <optional>
 #include <vector>
 #include <fstream>
+#include <filesystem>
 
 #include <runtime/local/datastructures/ContiguousTensor.h>
 #include <runtime/local/datastructures/ChunkedTensor.h>
@@ -151,9 +152,8 @@ struct ReadZarr<ContiguousTensor<VT>> {
             total_elements *= fmd.shape[i];
         }
 
-        std::string base_file_path = filename;
-
-        std::vector<std::pair<std::string, std::string>> chunk_keys_in_dir;    //= GetAllChunkKeys(base_file_path);
+        std::string base_file_path                                         = filename;
+        std::vector<std::pair<std::string, std::string>> chunk_keys_in_dir = GetAllChunkKeys(base_file_path);
 
         std::vector<std::vector<size_t>> chunk_ids;
         std::vector<std::string> full_chunk_file_paths;
@@ -163,13 +163,13 @@ struct ReadZarr<ContiguousTensor<VT>> {
               std::get<1>(chunk_keys_in_dir[i]), dimension_separator, fmd.shape, chunks_per_dim);
 
             if (tmp) {
-                full_chunk_file_paths.push_back(std::get<0>(chunk_keys_in_dir[i]));
+                full_chunk_file_paths.push_back(
+                  std::filesystem::canonical(std::filesystem::path(std::get<0>(chunk_keys_in_dir[i]))));
                 chunk_ids.push_back(tmp.value());
             }
         }
 
         if (full_chunk_file_paths.size() > 1) {
-            std::cout << "chunk count " << full_chunk_file_paths.size() << std::endl;
             throw std::runtime_error("ReadZarr->ContiguousTensor: Found more than one chunk");
         }
 
@@ -184,7 +184,7 @@ struct ReadZarr<ContiguousTensor<VT>> {
         //   ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
         //   ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
 
-        for (size_t i = 0; i < chunk_keys_in_dir.size(); i++) {
+        for (size_t i = 0; i < full_chunk_file_paths.size(); i++) {
             // IO via STL -> Posix ; substitue io_uring calls here
             std::ifstream f;
             f.open(full_chunk_file_paths[i], std::ios::in | std::ios::binary);
@@ -249,7 +249,8 @@ struct ReadZarr<ChunkedTensor<VT>> {
               std::get<1>(chunk_keys_in_dir[i]), dimension_separator, fmd.shape, chunks_per_dim);
 
             if (tmp) {
-                full_chunk_file_paths.push_back(std::get<0>(chunk_keys_in_dir[i]));
+                full_chunk_file_paths.push_back(
+                  std::filesystem::canonical(std::filesystem::path(std::get<0>(chunk_keys_in_dir[i]))));
                 chunk_ids.push_back(tmp.value());
             }
         }
@@ -264,7 +265,7 @@ struct ReadZarr<ChunkedTensor<VT>> {
         //   ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
         //   ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
 
-        for (size_t i = 0; i < chunk_keys_in_dir.size(); i++) {
+        for (size_t i = 0; i < full_chunk_file_paths.size(); i++) {
             // IO via STL -> Posix ; substitude io_uring calls here
             std::ifstream f;
             f.open(full_chunk_file_paths[i], std::ios::in | std::ios::binary);

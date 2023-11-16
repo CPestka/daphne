@@ -1,4 +1,5 @@
 #include <runtime/local/io/ZarrFileMetadata.h>
+
 #include <iostream>
 #include <optional>
 #include <vector>
@@ -7,11 +8,17 @@
 #include <cstdint>
 #include <filesystem>
 
-std::ostream & operator<<(std::ostream& out, const ByteOrder& bo) {
+std::ostream& operator<<(std::ostream& out, const ByteOrder& bo) {
     switch (bo) {
-        case ByteOrder::LITTLEENDIAN: out << "\"little endian\""; break;
-        case ByteOrder::BIGENDIAN: out << "\"big endian\""; break;
-        case ByteOrder::NOT_RELEVANT: out << "\"not relevant\""; break;
+        case ByteOrder::LITTLEENDIAN:
+            out << "\"little endian\"";
+            break;
+        case ByteOrder::BIGENDIAN:
+            out << "\"big endian\"";
+            break;
+        case ByteOrder::NOT_RELEVANT:
+            out << "\"not relevant\"";
+            break;
     }
     return out;
 }
@@ -73,7 +80,7 @@ std::ostream& operator<<(std::ostream& out, const ZarrDatatype& dt) {
     return out;
 }
 
-std::ostream & operator<<(std::ostream& out, ZarrFileMetaData& zm) {
+std::ostream& operator<<(std::ostream& out, ZarrFileMetaData& zm) {
     out << "Chunks [";
     for (const auto& e : zm.chunks) {
         out << e << " ";
@@ -96,13 +103,13 @@ std::ostream & operator<<(std::ostream& out, ZarrFileMetaData& zm) {
 
 enum struct ZarrParseCharState { IsNumeral, IsSeperator, IsInvalid };
 
-std::optional<std::vector<size_t>> GetChunkIdsFromChunkKey(const std::string &chunk_key_to_test,
-                                                           const std::string &dim_seperator,
-                                                           const std::vector<size_t> &tensor_shape,
-                                                           const std::vector<size_t> &amount_of_chunks_per_dim) {
+std::optional<std::vector<size_t>> GetChunkIdsFromChunkKey(const std::string& chunk_key_to_test,
+                                                           const std::string& dim_seperator,
+                                                           const std::vector<size_t>& tensor_shape,
+                                                           const std::vector<size_t>& amount_of_chunks_per_dim) {
     std::vector<uint64_t> parsed_chunk_ids;
-
     std::string tmp;
+
     for (size_t i = 0; i < chunk_key_to_test.size(); i++) {
         ZarrParseCharState current_char_state;
 
@@ -151,18 +158,19 @@ std::optional<std::vector<size_t>> GetChunkIdsFromChunkKey(const std::string &ch
             case ZarrParseCharState::IsInvalid:
                 return std::nullopt;
         }
-
-        if (parsed_chunk_ids.size() != tensor_shape.size()) {
-            return std::nullopt;
-        }
     }
+
+    if (parsed_chunk_ids.size() != tensor_shape.size()) {
+        return std::nullopt;
+    }
+
     return parsed_chunk_ids;
 }
 
-std::vector<std::pair<std::string, std::string>> GetAllChunkKeys(const std::string &base_dir_file_path) {
+std::vector<std::pair<std::string, std::string>> GetAllChunkKeys(const std::string& base_dir_file_path) {
     std::vector<std::pair<std::string, std::string>> chunk_keys;
 
-    for (auto const &dir_entry : std::filesystem::recursive_directory_iterator {base_dir_file_path}) {
+    for (auto const& dir_entry : std::filesystem::recursive_directory_iterator {base_dir_file_path}) {
         if (!dir_entry.is_directory()) {
             std::string full_path = dir_entry.path().string();
             size_t last_dir_sep   = full_path.find_last_of("/");

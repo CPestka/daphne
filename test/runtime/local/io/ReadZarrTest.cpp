@@ -30,15 +30,13 @@ TEST_CASE("ReadZarr->ContiguousTensor", TAG_IO) {
     // Read in [10,10,10] fp64 tensor
     readZarr<ContiguousTensor<double>>(ct_ptr, "./test/runtime/local/io/zarr_test/ContiguousTensorTest/example.zarr");
 
-    REQUIRE(ct_ptr->data[0] == Approx(0.0));
-    REQUIRE(ct_ptr->data[1] == Approx(1.0));
-    REQUIRE(ct_ptr->data[7] == Approx(7.0));
-    REQUIRE(ct_ptr->data[10] == Approx(100.0));
-    REQUIRE(ct_ptr->data[12] == Approx(102.0));
+    REQUIRE(ct_ptr->data[0] == 0.0);
+    REQUIRE(ct_ptr->data[1] == 1.0);
+    REQUIRE(ct_ptr->data[7] == 7.0);
+    REQUIRE(ct_ptr->data[10] == 100.0);
+    REQUIRE(ct_ptr->data[12] == 102.0);
 
     DataObjectFactory::destroy(ct_ptr);
-
-    std::cout << "Passed test --- tmp" << std::endl;
 }
 
 TEST_CASE("ReadZarr->ChunkedTensor", TAG_IO) {
@@ -62,5 +60,4 @@ TEST_CASE("ReadZarr->ChunkedTensor", TAG_IO) {
     REQUIRE(ptr_to_111_chunk[12] == Approx(101112.0));
 
     DataObjectFactory::destroy(ct_ptr);
-    std::cout << "Passed test --- tmp" << std::endl;
 }
