@@ -30,7 +30,7 @@ namespace mlir::daphne {
 #include <ir/daphneir/DaphneInferTypesOpInterface.cpp.inc>
 }
 
-#include <compiler/inference/TypeInferenceUtils.h>
+#include <ir/daphneir/TypeInferenceUtils.h>
 
 using namespace mlir;
 using namespace mlir::OpTrait;

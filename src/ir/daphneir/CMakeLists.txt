@@ -42,6 +42,7 @@ add_mlir_dialect_library(MLIRDaphne
     DaphneInferSparsityOpInterface.cpp
     DaphneInferTypesOpInterface.cpp
     DaphneVectorizableOpInterface.cpp
+    TypeInferenceUtils.cpp
 
     DEPENDS
     MLIRDaphneOpsIncGen

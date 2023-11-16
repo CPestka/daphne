@@ -29,6 +29,6 @@ add_library(SQLParser STATIC
         ${ANTLR4_SRC_FILES_SQLGrammar}
 )
 
-target_link_libraries(SQLParser PRIVATE
-        antlr4_shared
+target_link_libraries(SQLParser PRIVATE MLIRDaphne
+        antlr4_shared DataStructures
 )

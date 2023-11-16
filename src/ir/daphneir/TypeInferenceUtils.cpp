@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <compiler/inference/TypeInferenceUtils.h>
+#include <ir/daphneir/TypeInferenceUtils.h>
 
 int generality(mlir::Type t) {
     using namespace mlir;
