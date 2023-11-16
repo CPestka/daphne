@@ -222,15 +222,11 @@ std::vector<std::vector<ssize_t>> daphne::ReadOp::inferShape() {
         if (p.first) {
             FileMetaData fmd = CompilerUtils::getFileMetaData(getFileName());
             if (fmd.external) {
-                auto fmd = ZarrFileMetaDataParser::readMetaData(CompilerUtils::constantOrThrow<std::string>(getFileName()));
-                std::vector<std::vector<ssize_t>> tmp1;
-                std::vector<ssize_t> tmp2;
-                for (const auto& e : fmd.shape) {
-                    tmp2.push_back(e);
-                }
-                tmp1.push_back(tmp2);
-                return tmp1;
+                auto zfmd = ZarrFileMetaDataParser::readMetaData(p.second);
+                // size_t vs. ssize_t madness
+                return {std::vector<ssize_t>(zfmd.shape.begin(), zfmd.shape.end())};
             } else {
+                // todo: if not external, should we instead throw an error?
                 return {{static_cast<ssize_t>(fmd.numRows), static_cast<ssize_t>(fmd.numCols), static_cast<ssize_t>(fmd.numCols)}};
             }
         } else {
