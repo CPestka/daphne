@@ -46,17 +46,78 @@ ZarrFileMetaData ZarrFileMetaDataParser::readMetaData(const std::string& filenam
 
     // extract data type
     switch (zfmd.dtype.at(1)) {
-        case 'b': zfmd.data_type = ZarrDatatype::BOOLEAN; break;
-        case 'i': zfmd.data_type = ZarrDatatype::INTEGER; break;
-        case 'u': zfmd.data_type = ZarrDatatype::UINTEGER; break;
-        case 'f': zfmd.data_type = ZarrDatatype::FLOATING; break;
-        case 'c': zfmd.data_type = ZarrDatatype::COMPLEX_FLOATING; break;
-        case 'm': zfmd.data_type = ZarrDatatype::TIMEDELTA; break;
-        case 'M': zfmd.data_type = ZarrDatatype::DATETIME; break;
-        case 'S': zfmd.data_type = ZarrDatatype::STRING; break;
-        case 'U': zfmd.data_type = ZarrDatatype::UNICODE; break;
-        case 'V': zfmd.data_type = ZarrDatatype::OTHER; break;
-        default: break;
+        case 'b':
+            zfmd.data_type = ZarrDatatype::BOOLEAN;
+            break;
+        case 'i':
+            switch (zfmd.dtype.at(2)) {
+                case '8':
+                    zfmd.data_type = ZarrDatatype::INT64;
+                    break;
+                case '4':
+                    zfmd.data_type = ZarrDatatype::INT32;
+                    break;
+                case '2':
+                    zfmd.data_type = ZarrDatatype::INT16;
+                    break;
+                case '1':
+                    zfmd.data_type = ZarrDatatype::INT8;
+                    break;
+                default:
+                    throw std::runtime_error("Zarr meta data file parsing: Unsupported bit width of VT encountred.");
+            }
+            break;
+        case 'u':
+            switch (zfmd.dtype.at(2)) {
+                case '8':
+                    zfmd.data_type = ZarrDatatype::UINT64;
+                    break;
+                case '4':
+                    zfmd.data_type = ZarrDatatype::UINT32;
+                    break;
+                case '2':
+                    zfmd.data_type = ZarrDatatype::UINT16;
+                    break;
+                case '1':
+                    zfmd.data_type = ZarrDatatype::UINT8;
+                    break;
+                default:
+                    throw std::runtime_error("Zarr meta data file parsing: Unsupported bit width of VT encountred.");
+            }
+            break;
+        case 'f':
+            switch (zfmd.dtype.at(2)) {
+                case '8':
+                    zfmd.data_type = ZarrDatatype::FP64;
+                    break;
+                case '4':
+                    zfmd.data_type = ZarrDatatype::FP32;
+                    break;
+                default:
+                    throw std::runtime_error("Zarr meta data file parsing: Unsupported bit width of VT encountred.");
+            }
+            break;
+        case 'c':
+            zfmd.data_type = ZarrDatatype::COMPLEX_FLOATING;
+            break;
+        case 'm':
+            zfmd.data_type = ZarrDatatype::TIMEDELTA;
+            break;
+        case 'M':
+            zfmd.data_type = ZarrDatatype::DATETIME;
+            break;
+        case 'S':
+            zfmd.data_type = ZarrDatatype::STRING;
+            break;
+        case 'U':
+            zfmd.data_type = ZarrDatatype::UNICODE;
+            break;
+        case 'V':
+            zfmd.data_type = ZarrDatatype::OTHER;
+            break;
+        default:
+            throw std::runtime_error("Zarr meta data file parsing: Unsupported VT encountered.");
+            break;
     }
 
     // extract type width in bytes

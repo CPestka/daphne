@@ -16,20 +16,26 @@
 
 #pragma once
 
+#include <optional>
 #include <vector>
 #include <string>
+#include <tuple>
+#include <cstdint>
 
-enum class ByteOrder {
-    LITTLEENDIAN,
-    BIGENDIAN,
-    NOT_RELEVANT
-};
+enum class ByteOrder { LITTLEENDIAN, BIGENDIAN, NOT_RELEVANT };
 
 enum class ZarrDatatype {
     BOOLEAN,
-    FLOATING,
-    INTEGER,
-    UINTEGER,
+    FP64,
+    FP32,
+    UINT64,
+    UINT32,
+    UINT16,
+    UINT8,
+    INT64,
+    INT32,
+    INT16,
+    INT8,
     COMPLEX_FLOATING,
     TIMEDELTA,
     DATETIME,
@@ -51,6 +57,13 @@ struct ZarrFileMetaData {
     uint16_t nBytes;
 };
 
-std::ostream & operator<<(std::ostream& out, const ByteOrder& bo);
-std::ostream & operator<<(std::ostream& out, const ZarrDatatype& dt);
-std::ostream & operator<<(std::ostream& out, ZarrFileMetaData& zm);
+std::ostream& operator<<(std::ostream& out, const ByteOrder& bo);
+std::ostream& operator<<(std::ostream& out, const ZarrDatatype& dt);
+std::ostream& operator<<(std::ostream& out, ZarrFileMetaData& zm);
+
+std::optional<std::vector<size_t>> GetChunkIdsFromChunkKey(const std::string &chunk_key_to_test,
+                                                           const std::string &dim_seperator,
+                                                           const std::vector<size_t> &tensor_shape,
+                                                           const std::vector<size_t> &amount_of_chunks_per_dim);
+
+std::vector<std::pair<std::string, std::string>> GetAllChunkKeys(const std::string &base_dir_file_path);
