@@ -54,35 +54,30 @@ class ContiguousTensor : public Tensor<ValueType> {
         // data = std::make_shared<ValueType[]>(this->total_element_count);
 
         switch (init_code) {
-            case NONE: {
+            case InitCode::NONE: {
             } break;
-            case ZERO: {
+            case InitCode::ZERO: {
                 for (size_t i = 0; i < this->total_element_count; i++) {
                     data.get()[i] = 0;
                 }
                 break;
             }
-            case MAX: {
+            case InitCode::MAX: {
                 for (size_t i = 0; i < this->total_element_count; i++) {
                     data.get()[i] = std::numeric_limits<ValueType>::max();
                 }
                 break;
             }
-            case MIN: {
+            case InitCode::MIN: {
                 for (size_t i = 0; i < this->total_element_count; i++) {
                     data.get()[i] = std::numeric_limits<ValueType>::min();
                 }
                 break;
             }
-            case IOTA: {
+            case InitCode::IOTA: {
                 for (size_t i = 0; i < this->total_element_count; i++) {
                     data.get()[i] = i;
                 }
-                break;
-            }
-            default: {
-                // unreachable
-                std::abort();
                 break;
             }
         }
@@ -254,7 +249,7 @@ class ContiguousTensor : public Tensor<ValueType> {
         }
 
         ContiguousTensor<ValueType> *new_tensor =
-          DataObjectFactory::create<ContiguousTensor<ValueType>>(new_tensor_shape, NONE);
+          DataObjectFactory::create<ContiguousTensor<ValueType>>(new_tensor_shape, InitCode::NONE);
 
         std::vector<size_t> current_indices;
         current_indices.resize(this->rank);

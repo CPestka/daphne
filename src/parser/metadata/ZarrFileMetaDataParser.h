@@ -18,7 +18,7 @@
 
 #include <string>
 
-class ZarrFileMetaData;
+struct ZarrFileMetaData;
 
 struct ZarrFileMetaDataParser {
     static ZarrFileMetaData readMetaData(const std::string& filename);

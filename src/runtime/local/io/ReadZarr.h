@@ -26,42 +26,43 @@
 // ****************************************************************************
 // Struct for partial template specialization
 // ****************************************************************************
-template <class DTRes> struct ReadZarr {
+template<class DTRes>
+struct ReadZarr {
     static void apply(DTRes *&res, const char *filename) = delete;
 };
 
 // ****************************************************************************
 // Convenience function
 // ****************************************************************************
-template <class DTRes>
+template<class DTRes>
 void readZarr(DTRes *&res, const char *filename) {
     ReadZarr<DTRes>::apply(res, filename);
 }
 
-template <typename VT>
+template<typename VT>
 struct ReadZarr<ContiguousTensor<VT>> {
     static void apply(ContiguousTensor<VT> *&res, const char *filename) {
         auto fmd = ZarrFileMetaDataParser::readMetaData(filename);
-        res = DataObjectFactory::create<ContiguousTensor<VT>>(fmd.shape, InitCode::NONE);
+        res      = DataObjectFactory::create<ContiguousTensor<VT>>(fmd.shape, InitCode::NONE);
 
         // now do the actual reading part
-        auto dimension_separator = fmd.dimension_separator;
+        // auto dimension_separator = fmd.dimension_separator;
 
-        auto byte_order = fmd.byte_order;
+        // auto byte_order = fmd.byte_order;
     }
 };
 
-template <typename VT>
+template<typename VT>
 struct ReadZarr<ChunkedTensor<VT>> {
     static void apply(ChunkedTensor<VT> *&res, const char *filename) {
         auto fmd = ZarrFileMetaDataParser::readMetaData(filename);
-        res = DataObjectFactory::create<ChunkedTensor<VT>>(fmd.shape, fmd.chunks, InitCode::NONE);
+        res      = DataObjectFactory::create<ChunkedTensor<VT>>(fmd.shape, fmd.chunks, InitCode::NONE);
 
         // now do the actual reading part
-        auto dimension_separator = fmd.dimension_separator;
+        // auto dimension_separator = fmd.dimension_separator;
 
-        auto byte_order = fmd.byte_order;
+        // auto byte_order = fmd.byte_order;
     }
 };
 
-#endif // ZARR_IO_H
+#endif    // ZARR_IO_H

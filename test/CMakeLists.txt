@@ -76,6 +76,7 @@ set(TEST_SOURCES
         runtime/local/io/WriteDaphneTest.cpp
         runtime/local/io/ReadDaphneTest.cpp
         runtime/local/io/DaphneSerializerTest.cpp
+        runtime/local/io/ReadZarrTest.cpp
 
         runtime/local/kernels/AggAllTest.cpp
         runtime/local/kernels/AggColTest.cpp

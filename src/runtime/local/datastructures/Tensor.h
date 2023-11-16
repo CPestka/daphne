@@ -68,4 +68,4 @@ class Tensor : public Structure {
     }
 };
 
-enum InitCode { NONE, ZERO, MAX, MIN, IOTA };
+enum struct InitCode { NONE, ZERO, MAX, MIN, IOTA };

@@ -84,12 +84,12 @@ class ChunkedTensor : public Tensor<ValueType> {
         chunk_materialization_flags = std::make_unique<std::atomic<bool>[]>(total_chunk_count);
 
         switch (init_code) {
-            case NONE:
+            case InitCode::NONE:
                 for (size_t i = 0; i < total_chunk_count; i++) {
                     chunk_materialization_flags[i] = false;
                 }
                 break;
-            case ZERO: {
+            case InitCode::ZERO: {
                 for (size_t i = 0; i < total_chunk_count; i++) {
                     chunk_materialization_flags[i] = true;
                 }
@@ -98,7 +98,7 @@ class ChunkedTensor : public Tensor<ValueType> {
                 }
                 break;
             }
-            case MAX: {
+            case InitCode::MAX: {
                 for (size_t i = 0; i < total_chunk_count; i++) {
                     chunk_materialization_flags[i] = true;
                 }
@@ -107,7 +107,7 @@ class ChunkedTensor : public Tensor<ValueType> {
                 }
                 break;
             }
-            case MIN: {
+            case InitCode::MIN: {
                 for (size_t i = 0; i < total_chunk_count; i++) {
                     chunk_materialization_flags[i] = true;
                 }
@@ -116,7 +116,7 @@ class ChunkedTensor : public Tensor<ValueType> {
                 }
                 break;
             }
-            case IOTA: {
+            case InitCode::IOTA: {
                 for (size_t i = 0; i < total_chunk_count; i++) {
                     chunk_materialization_flags[i] = true;
                 }
@@ -144,10 +144,6 @@ class ChunkedTensor : public Tensor<ValueType> {
                 }
                 break;
             }
-            default:
-                // unreachable
-                std::abort();
-                break;
         }
     }
 
@@ -646,8 +642,8 @@ class ChunkedTensor : public Tensor<ValueType> {
             return nullptr;
         }
         if (this->rank == 0) {
-            ChunkedTensor<ValueType> *tmp =
-              DataObjectFactory::create<ChunkedTensor<ValueType>>(this->tensor_shape, this->chunk_shape, NONE);
+            ChunkedTensor<ValueType> *tmp = DataObjectFactory::create<ChunkedTensor<ValueType>>(
+              this->tensor_shape, this->chunk_shape, InitCode::NONE);
             tmp->data.get()[0]             = data.get()[0];
             chunk_materialization_flags[0] = true;
             return tmp;
@@ -676,7 +672,7 @@ class ChunkedTensor : public Tensor<ValueType> {
         }
 
         ChunkedTensor<ValueType> *new_tensor =
-          DataObjectFactory::create<ChunkedTensor<ValueType>>(new_tensor_shape, chunk_shape, NONE);
+          DataObjectFactory::create<ChunkedTensor<ValueType>>(new_tensor_shape, chunk_shape, InitCode::NONE);
 
         std::vector<size_t> new_chunk_count_strides;
         new_chunk_count_strides.push_back(1);
@@ -716,7 +712,7 @@ class ChunkedTensor : public Tensor<ValueType> {
 
         if (this->rank == 0) {
             ChunkedTensor<ValueType> *tmp =
-              DataObjectFactory::create<ChunkedTensor<ValueType>>(this->tensor_shape, chunk_shape, NONE);
+              DataObjectFactory::create<ChunkedTensor<ValueType>>(this->tensor_shape, chunk_shape, InitCode::NONE);
             tmp->data.get()[0] = data.get()[0];
             return tmp;
         }
@@ -747,7 +743,7 @@ class ChunkedTensor : public Tensor<ValueType> {
         }
 
         ChunkedTensor<ValueType> *new_tensor =
-          DataObjectFactory::create<ChunkedTensor<ValueType>>(new_tensor_shape, new_chunk_shape, NONE);
+          DataObjectFactory::create<ChunkedTensor<ValueType>>(new_tensor_shape, new_chunk_shape, InitCode::NONE);
 
         for (size_t i = 0; i < new_tensor->total_chunk_count; i++) {
             new_tensor->chunk_materialization_flags[i] = true;
@@ -813,7 +809,7 @@ class ChunkedTensor : public Tensor<ValueType> {
 
         if (this->rank == 0) {
             ContiguousTensor<ValueType> *tmp =
-              DataObjectFactory::create<ContiguousTensor<ValueType>>(this->tensor_shape, NONE);
+              DataObjectFactory::create<ContiguousTensor<ValueType>>(this->tensor_shape, InitCode::NONE);
             tmp->data.get()[0] = data.get()[0];
             return tmp;
         }
@@ -844,7 +840,7 @@ class ChunkedTensor : public Tensor<ValueType> {
         }
 
         ContiguousTensor<ValueType> *new_tensor =
-          DataObjectFactory::create<ContiguousTensor<ValueType>>(new_tensor_shape, NONE);
+          DataObjectFactory::create<ContiguousTensor<ValueType>>(new_tensor_shape, InitCode::NONE);
 
         std::vector<size_t> current_new_indices;
         std::vector<size_t> current_old_indices;
