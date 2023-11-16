@@ -21,7 +21,6 @@
 #include <stdexcept>
 #include <type_traits>
 #include <optional>
-#include <filesystem>
 #include <vector>
 #include <fstream>
 
@@ -169,7 +168,8 @@ struct ReadZarr<ContiguousTensor<VT>> {
             }
         }
 
-        if (full_chunk_file_paths.size() != 1) {
+        if (full_chunk_file_paths.size() > 1) {
+            std::cout << "chunk count " << full_chunk_file_paths.size() << std::endl;
             throw std::runtime_error("ReadZarr->ContiguousTensor: Found more than one chunk");
         }
 
