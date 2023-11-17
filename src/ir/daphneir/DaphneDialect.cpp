@@ -384,12 +384,15 @@ namespace mlir::daphne {
 namespace mlir::daphne {
     namespace detail {
         struct TensorTypeStorage : public ::mlir::TypeStorage {
-            TensorTypeStorage(::mlir::Type elementType, ssize_t numX, ssize_t numY, ssize_t numZ)
-                : elementType(elementType), numX(numX), numY(numY), numZ(numZ) {
-            }
+            TensorTypeStorage(::mlir::Type elementType,
+                              ssize_t numX,
+                              ssize_t numY,
+                              ssize_t numZ,
+                              TensorRepresentation representation)
+                : elementType(elementType), numX(numX), numY(numY), numZ(numZ), representation(representation) {}
 
             /// The hash key is a tuple of the parameter types.
-            using KeyTy = std::tuple<::mlir::Type, ssize_t, ssize_t, ssize_t>;
+            using KeyTy = std::tuple<::mlir::Type, ssize_t, ssize_t, ssize_t, TensorRepresentation>;
             bool operator==(const KeyTy &tblgenKey) const {
                 if (!(elementType == std::get<0>(tblgenKey)))
                     return false;
@@ -397,47 +400,45 @@ namespace mlir::daphne {
                     return false;
                 if (numY != std::get<2>(tblgenKey))
                     return false;
-                if (numZ != std::get<3>(tblgenKey))
+                if(numZ != std::get<3>(tblgenKey))
+                    return false;
+                if(representation != std::get<4>(tblgenKey))
                     return false;
                 return true;
             }
             static ::llvm::hash_code hashKey(const KeyTy &tblgenKey) {
-                return ::llvm::hash_combine(
-                  std::get<0>(tblgenKey), std::get<1>(tblgenKey), std::get<2>(tblgenKey), std::get<3>(tblgenKey));
+                return ::llvm::hash_combine(std::get<0>(tblgenKey),
+                    std::get<1>(tblgenKey),
+                    std::get<2>(tblgenKey),
+                    std::get<3>(tblgenKey),
+                    std::get<4>(tblgenKey));
             }
 
             /// Define a construction method for creating a new instance of this
             /// storage.
             static TensorTypeStorage *construct(::mlir::TypeStorageAllocator &allocator, const KeyTy &tblgenKey) {
                 auto elementType = std::get<0>(tblgenKey);
-                auto numX        = std::get<1>(tblgenKey);
-                auto numY        = std::get<2>(tblgenKey);
-                auto numZ        = std::get<3>(tblgenKey);
-
-                return new (allocator.allocate<TensorTypeStorage>()) TensorTypeStorage(elementType, numX, numY, numZ);
+                auto numX = std::get<1>(tblgenKey);
+                auto numY = std::get<2>(tblgenKey);
+                auto numZ = std::get<3>(tblgenKey);
+                auto representation = std::get<4>(tblgenKey);
+                return new(allocator.allocate<TensorTypeStorage>())
+                    TensorTypeStorage(elementType, numX, numY, numZ, representation);
             }
             ::mlir::Type elementType;
             ssize_t numX;
             ssize_t numY;
             ssize_t numZ;
+            TensorRepresentation representation;
         };
-    }    // namespace detail
-    ::mlir::Type TensorType::getElementType() const {
-        return getImpl()->elementType;
     }
-    ssize_t TensorType::getNumX() const {
-        return getImpl()->numX;
-    }
-    ssize_t TensorType::getNumY() const {
-        return getImpl()->numY;
-    }
-    ssize_t TensorType::getNumZ() const {
-        return getImpl()->numZ;
-    }
-    ssize_t TensorType::getNumDim() const {
-        return 3;
-    }
-}    // namespace mlir::daphne
+    ::mlir::Type TensorType::getElementType() const { return getImpl()->elementType; }
+    ssize_t TensorType::getNumX() const { return getImpl()->numX; }
+    ssize_t TensorType::getNumY() const { return getImpl()->numY; }
+    ssize_t TensorType::getNumZ() const { return getImpl()->numZ; }
+    TensorRepresentation TensorType::getRepresentation() const { return getImpl()->representation; }
+    ssize_t TensorType::getNumDim() const { return 3; }
+}
 
 mlir::OpFoldResult mlir::daphne::ConstantOp::fold(FoldAdaptor adaptor) {
     assert(adaptor.getOperands().empty() && "constant has no operands");
@@ -486,11 +487,8 @@ mlir::OpFoldResult mlir::daphne::ConstantOp::fold(FoldAdaptor adaptor) {
     return mlir::success();
 }
 
-::mlir::LogicalResult mlir::daphne::TensorType::verify(::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError,
-                                                       Type elementType,
-                                                       ssize_t numX,
-                                                       ssize_t numY,
-                                                       ssize_t numZ) {
+::mlir::LogicalResult mlir::daphne::TensorType::verify(::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError, Type elementType, ssize_t numX, ssize_t numY, ssize_t numZ, TensorRepresentation representation)
+{
     return mlir::success();
 }
 

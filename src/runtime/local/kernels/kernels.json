@@ -2179,6 +2179,15 @@
             [["ContiguousTensor", "uint32_t"]],
             [["ContiguousTensor", "uint8_t"]],
             [["ContiguousTensor", "size_t"]],
+            [["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "int8_t"]],
+            [["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "size_t"]],
             ["Frame"],
             ["char"]
         ]

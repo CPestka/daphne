@@ -221,7 +221,7 @@ def Tensor : Daphne_Type<"Tensor"> {
     // TODO Maybe we should rename "element type" to "value type" everywhere.
     let parameters = (ins
         "::mlir::Type":$elementType,
-        "ssize_t":$numX, "ssize_t":$numY, "ssize_t":$numZ
+        "ssize_t":$numX, "ssize_t":$numY, "ssize_t":$numZ, "TensorRepresentation":$representation
     );
     let genVerifyDecl = 1;
     // NOTE: float needs special treatment for equality check and hashing (epsilon)
@@ -231,7 +231,7 @@ def Tensor : Daphne_Type<"Tensor"> {
         // Creates a TensorType from mere element type information, with all
         // other parameters reset.
         TypeBuilder<(ins "::mlir::Type":$elementType), [{
-            return Base::get($_ctxt, elementType, -1, -1, -1);
+            return Base::get($_ctxt, elementType, -1, -1, -1, TensorRepresentation::Contiguous);
         }]>,
     ];
 
@@ -243,11 +243,15 @@ def Tensor : Daphne_Type<"Tensor"> {
         ssize_t getNumDim() const;
 
         ::mlir::daphne::TensorType withElementType(::mlir::Type elementType) {
-            return get(getContext(), elementType, getNumX(), getNumY(), getNumZ());
+            return get(getContext(), elementType, getNumX(), getNumY(), getNumZ(), getRepresentation());
         }
 
         ::mlir::daphne::TensorType withShape(ssize_t numX, ssize_t numY, ssize_t numZ) {
-            return get(getContext(), getElementType(), numX, numY, numZ);
+            return get(getContext(), getElementType(), numX, numY, numZ, getRepresentation());
+        }
+
+        ::mlir::daphne::TensorType withRepresentation(::mlir::daphne::TensorRepresentation rep) {
+            return get(getContext(), getElementType(), getNumX(), getNumY(), getNumZ(), rep);
         }
 
         // The following methods return a TensorType preserving the specified
@@ -258,7 +262,7 @@ def Tensor : Daphne_Type<"Tensor"> {
         }
 
         ::mlir::daphne::TensorType withSameElementTypeAndRepr() {
-            return get(getContext(), getElementType(), -1, -1, -1);
+            return get(getContext(), getElementType(), -1, -1, -1, getRepresentation());
         }
 
         /**

@@ -159,7 +159,12 @@ public:
                 }
             }
         else if(auto tensTy = t.dyn_cast<mlir::daphne::TensorType>()) {
-            return "ContiguousTensor_" + mlirTypeToCppTypeName(tensTy.getElementType(), false);
+            switch (tensTy.getRepresentation()) {
+                case mlir::daphne::TensorRepresentation::Chunked:
+                    return "ChunkedTensor_" + mlirTypeToCppTypeName(tensTy.getElementType(), false);
+                case mlir::daphne::TensorRepresentation::Contiguous:
+                    return "ContiguousTensor_" + mlirTypeToCppTypeName(tensTy.getElementType(), false);
+            }
         }
         else if(t.isa<mlir::daphne::FrameType>())
             if(generalizeToStructure)
