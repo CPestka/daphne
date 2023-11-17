@@ -328,6 +328,76 @@ class ChunkedTensor : public Tensor<ValueType> {
         return chunk_ids;
     }
 
+    std::optional<std::vector<std::pair<size_t, size_t>>> GetChunkRangeFromIdRange(
+      const std::vector<std::pair<size_t, size_t>> &element_id_ranges) {
+        if (element_id_ranges.size() != this->rank) {
+            return std::nullopt;
+        }
+
+        // Bounds check ranges
+        for (size_t i = 0; i < this->rank; i++) {
+            if ((std::get<0>(element_id_ranges[i]) > std::get<1>(element_id_ranges[i])) ||
+                (std::get<0>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
+                (std::get<0>(element_id_ranges[i]) < 0) ||
+                (std::get<1>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
+                (std::get<1>(element_id_ranges[i]) < 0)) {
+                return std::nullopt;
+            }
+        }
+
+        std::vector<std::pair<size_t, size_t>> chunk_id_ranges;
+        chunk_id_ranges.reserve(this->rank);
+        for (size_t i = 0; i < this->rank; i++) {
+            chunk_id_ranges.push_back(
+              {std::get<0>(element_id_ranges[i]) / chunk_shape[i], std::get<1>(element_id_ranges[i]) / chunk_shape[i]});
+        }
+        return chunk_id_ranges;
+    }
+
+    std::optional<std::vector<std::vector<size_t>>> GetChunkListFromIdRange(
+      const std::vector<std::pair<size_t, size_t>> &element_id_ranges) {
+        if (element_id_ranges.size() != this->rank) {
+            return std::nullopt;
+        }
+        if (this->rank == 0) {
+            return std::nullopt;
+        }
+
+        // Bounds check ranges
+        for (size_t i = 0; i < this->rank; i++) {
+            if ((std::get<0>(element_id_ranges[i]) > std::get<1>(element_id_ranges[i])) ||
+                (std::get<0>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
+                (std::get<0>(element_id_ranges[i]) < 0) ||
+                (std::get<1>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
+                (std::get<1>(element_id_ranges[i]) < 0)) {
+                return std::nullopt;
+            }
+        }
+
+        size_t total_chunk_count = std::get<1>(element_id_ranges[0]) - std::get<0>(element_id_ranges[0]) + 1;
+        for (size_t i = 0; i < this->rank; i++) {
+            total_chunk_count *= (std::get<1>(element_id_ranges[i]) - std::get<0>(element_id_ranges[i]) + 1);
+        }
+
+        std::vector<size_t> strides;
+        strides.push_back(1);
+        for (size_t i = 0; i < (this->rank - 1); i++) {
+            strides.push_back(std::get<1>(element_id_ranges[i]) - std::get<0>(element_id_ranges[i]) + 1);
+        }
+
+        std::vector<std::vector<size_t>> chunk_id_list;
+        chunk_id_list.resize(total_chunk_count);
+        for (size_t i = 0; i < total_chunk_count; i++) {
+            int64_t tmp = i;
+            for (int64_t j = (this->rank - 1); j >= 0; j--) {
+                chunk_id_list[i][static_cast<size_t>(j)] = std::get<0>(element_id_ranges[j]) + (tmp / strides[j]);
+                tmp                                      = tmp % strides[j];
+            }
+        }
+
+        return chunk_id_list;
+    }
+
     bool IsValueMaterialized(const std::vector<size_t> &indices) const {
         return chunk_materialization_flags[getLinearChunkIdFromChunkIds(getChunkIdsFromIds(indices))];
     }

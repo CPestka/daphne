@@ -39,12 +39,26 @@ struct ReadZarr {
     static void apply(DTRes *&res, const char *filename) = delete;
 };
 
+template<class DTRes>
+struct PartialReadZarr {
+    static void apply(DTRes *&res,
+                      const char *filename,
+                      const std::vector<std::pair<size_t, size_t>> &element_id_ranges) = delete;
+};
+
 // ****************************************************************************
 // Convenience function
 // ****************************************************************************
 template<class DTRes>
 void readZarr(DTRes *&res, const char *filename) {
     ReadZarr<DTRes>::apply(res, filename);
+}
+
+template<class DTRes>
+void partiallyReadZarr(DTRes *&res,
+                       const char *filename,
+                       const std::vector<std::pair<size_t, size_t>> &element_id_ranges) {
+    PartialReadZarr<DTRes>::apply(res, filename, element_id_ranges);
 }
 
 template<typename VT>
@@ -153,12 +167,13 @@ struct ReadZarr<ContiguousTensor<VT>> {
             total_elements *= fmd.shape[i];
         }
 
+        // Fetch all avaiable chunk keys within the respective directory
         std::string base_file_path                                         = filename;
         std::vector<std::pair<std::string, std::string>> chunk_keys_in_dir = GetAllChunkKeys(base_file_path);
 
+        // Check retrieved keys for vailidity and generate full canonical path and ascociated chunk ids from it
         std::vector<std::vector<size_t>> chunk_ids;
         std::vector<std::string> full_chunk_file_paths;
-
         for (size_t i = 0; i < chunk_keys_in_dir.size(); i++) {
             auto tmp = GetChunkIdsFromChunkKey(
               std::get<1>(chunk_keys_in_dir[i]), dimension_separator, fmd.shape, chunks_per_dim);
@@ -184,6 +199,8 @@ struct ReadZarr<ContiguousTensor<VT>> {
           ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
           ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
 
+        // For all requested chunks open the respective file, fetch the ptr to the chunks location in the chunked tensor
+        // and directly read into it
         for (size_t i = 0; i < full_chunk_file_paths.size(); i++) {
             // IO via STL -> Posix ; substitue io_uring calls here
             std::ifstream f;
@@ -200,6 +217,8 @@ struct ReadZarr<ContiguousTensor<VT>> {
                 throw std::runtime_error("ReadZarr->ContiguousTensor: failed to read chunk file.");
             }
 
+            // Files endianness does not match the native endianness -> byte reverse every read element in the read
+            // chunk
             if (!endianness_match) {
                 ReverseArray(res->data.get(), total_elements);
             }
@@ -237,13 +256,13 @@ struct ReadZarr<ChunkedTensor<VT>> {
             elements_per_chunk *= fmd.chunks[i];
         }
 
-        std::string base_file_path = filename;
-
+        // Fetch all avaiable chunk keys within the respective directory
+        std::string base_file_path                                         = filename;
         std::vector<std::pair<std::string, std::string>> chunk_keys_in_dir = GetAllChunkKeys(base_file_path);
 
+        // Check retrieved keys for vailidity and generate full canonical path and ascociated chunk ids from it
         std::vector<std::vector<size_t>> chunk_ids;
         std::vector<std::string> full_chunk_file_paths;
-
         for (size_t i = 0; i < chunk_keys_in_dir.size(); i++) {
             auto tmp = GetChunkIdsFromChunkKey(
               std::get<1>(chunk_keys_in_dir[i]), dimension_separator, fmd.shape, chunks_per_dim);
@@ -265,6 +284,8 @@ struct ReadZarr<ChunkedTensor<VT>> {
           ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
           ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
 
+        // For all requested chunks open the respective file, fetch the ptr to the chunks location in the chunked tensor
+        // and directly read into it
         for (size_t i = 0; i < full_chunk_file_paths.size(); i++) {
             // IO via STL -> Posix ; substitude io_uring calls here
             std::ifstream f;
@@ -281,11 +302,135 @@ struct ReadZarr<ChunkedTensor<VT>> {
                 throw std::runtime_error("ReadZarr->ChunkedTensor: failed to read chunk file.");
             }
 
+            // Files endianness does not match the native endianness -> byte reverse every read element in the read
+            // chunk
             if (!endianness_match) {
                 ReverseArray(res->data.get(), elements_per_chunk);
             }
 
             res->chunk_materialization_flags[res->getLinearChunkIdFromChunkIds(chunk_ids[i])] = true;
+        }
+    }
+};
+
+// As in the tensor classes themselves the ranges are inclusive on both sides
+template<typename VT>
+struct PartialReadZarr<ChunkedTensor<VT>> {
+    static void apply(ChunkedTensor<VT> *&res,
+                      const char *filename,
+                      const std::vector<std::pair<size_t, size_t>> &element_id_ranges) {
+        auto fmd = ZarrFileMetaDataParser::readMetaData(filename);
+
+        if (fmd.shape.size() == 0) {
+            throw std::runtime_error(
+              "PartialReadZarr->ChunkedTensor: Tensors of dim 0 i.e. scalars are currently not supported during "
+              "reading");
+        }
+        if (fmd.shape.size() != fmd.chunks.size()) {
+            throw std::runtime_error(
+              "PartialReadZarr->ChunkedTensor: Dimension of tensor shape and chunk shape are missmatched");
+        }
+
+        CheckZarrMetaDataVT<VT>(fmd.data_type);
+
+        res = DataObjectFactory::create<ChunkedTensor<VT>>(fmd.shape, fmd.chunks, InitCode::NONE);
+
+        auto dimension_separator = fmd.dimension_separator;
+        auto byte_order          = fmd.byte_order;
+        std::vector<size_t> chunks_per_dim;
+        chunks_per_dim.resize(fmd.shape.size());
+        for (size_t i = 0; i < chunks_per_dim.size(); i++) {
+            chunks_per_dim[i] = fmd.shape[i] / fmd.chunks[i];
+        }
+        uint64_t elements_per_chunk = fmd.chunks[0];
+        for (size_t i = 1; i < chunks_per_dim.size(); i++) {
+            elements_per_chunk *= fmd.chunks[i];
+        }
+
+        // Fetch all avaiable chunk keys within the respective directory
+        std::string base_file_path                                         = filename;
+        std::vector<std::pair<std::string, std::string>> chunk_keys_in_dir = GetAllChunkKeys(base_file_path);
+
+        // Check retrieved keys for vailidity and generate full canonical path and ascociated chunk ids from it
+        std::vector<std::vector<size_t>> chunk_ids;
+        std::vector<std::string> full_chunk_file_paths;
+        for (size_t i = 0; i < chunk_keys_in_dir.size(); i++) {
+            auto tmp = GetChunkIdsFromChunkKey(
+              std::get<1>(chunk_keys_in_dir[i]), dimension_separator, fmd.shape, chunks_per_dim);
+
+            if (tmp) {
+                full_chunk_file_paths.push_back(
+                  std::filesystem::canonical(std::filesystem::path(std::get<0>(chunk_keys_in_dir[i]))));
+                chunk_ids.push_back(tmp.value());
+            }
+        }
+
+        // Convert element ranges into list of chunks required
+        std::optional<std::vector<std::vector<size_t>>> requested_chunk_ids =
+          res->GetChunkListFromIdRange(element_id_ranges);
+
+        if (!requested_chunk_ids) {
+            throw std::runtime_error(
+              "PartialReadZarr->ChunkedTensor: Invalid element range. Range out of bounds or has missmatching "
+              "dimension");
+        }
+
+        // Match requested chunks to the available chunks in the fs, discard not-requested files and throw on missing
+        // file
+        std::vector<std::string> full_requested_chunk_file_paths;
+        full_requested_chunk_file_paths.reserve(requested_chunk_ids.value().size());
+        for (size_t i = 0; i < requested_chunk_ids.value().size(); i++) {
+            bool found_file_match_for_requested_chunk = false;
+            for (size_t j = 0; j < full_chunk_file_paths.size(); j++) {
+                if (chunk_ids[i] == requested_chunk_ids.value()[j]) {
+                    found_file_match_for_requested_chunk = true;
+                    full_requested_chunk_file_paths.push_back(full_chunk_file_paths[j]);
+
+                    full_chunk_file_paths.erase(full_chunk_file_paths.begin() + static_cast<int64_t>(j));
+                    chunk_ids.erase(chunk_ids.begin() + static_cast<int64_t>(j));
+                    break;
+                }
+            }
+            if (!found_file_match_for_requested_chunk) {
+                throw std::runtime_error("PartialReadZarr->ChunkedTensor: Did not find all requested chunk files");
+            }
+        }
+
+        if ((std::endian::native != std::endian::little) && (std::endian::native != std::endian::big)) {
+            throw std::runtime_error(
+              "PartialReadZarr->ChunkedTensor: Native endianness that is not either little or big endian is not "
+              "supported.");
+        }
+
+        bool endianness_match =
+          ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
+          ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
+
+        // For all requested chunks open the respective file, fetch the ptr to the chunks location in the chunked tensor
+        // and directly read into it
+        for (size_t i = 0; i < full_requested_chunk_file_paths.size(); i++) {
+            // IO via STL -> Posix ; substitude io_uring calls here
+            std::ifstream f;
+            f.open(full_requested_chunk_file_paths[i], std::ios::in | std::ios::binary);
+
+            if (!f.good()) {
+                throw std::runtime_error("PartialReadZarr->ChunkedTensor: failed to open chunk file.");
+            }
+
+            uint64_t amount_of_bytes_to_read = sizeof(VT) * elements_per_chunk;
+            f.read(reinterpret_cast<char *>(res->getPtrToChunk(requested_chunk_ids.value()[i])), amount_of_bytes_to_read);
+
+            if (!f.good()) {
+                throw std::runtime_error("PartialReadZarr->ChunkedTensor: failed to read chunk file.");
+            }
+
+            // Files endianness does not match the native endianness -> byte reverse every read element in the read
+            // chunk
+            if (!endianness_match) {
+                ReverseArray(res->data.get(), elements_per_chunk);
+            }
+
+            res->chunk_materialization_flags[res->getLinearChunkIdFromChunkIds(requested_chunk_ids.value()[i])] = true;
         }
     }
 };

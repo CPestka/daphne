@@ -61,3 +61,27 @@ TEST_CASE("ReadZarr->ChunkedTensor", TAG_IO) {
 
     DataObjectFactory::destroy(ct_ptr);
 }
+
+TEST_CASE("PartialReadZarr->ChunkedTensor", TAG_IO) {
+    ChunkedTensor<double>* ct_ptr;
+
+    // Read in [100,100,100] fp64 tensor with chunking [10,10,10]
+    partiallyReadZarr<ChunkedTensor<double>>(
+      ct_ptr, "./test/runtime/local/io/zarr_test/ChunkedTensorTest/example.zarr", {{0,19},{0,19},{0,19}});
+
+    REQUIRE(ct_ptr->data[0] == Approx(0.0));
+    REQUIRE(ct_ptr->data[1] == Approx(1.0));
+    REQUIRE(ct_ptr->data[7] == Approx(7.0));
+    REQUIRE(ct_ptr->data[10] == Approx(100.0));
+    REQUIRE(ct_ptr->data[12] == Approx(102.0));
+
+    double* ptr_to_111_chunk = ct_ptr->getPtrToChunk({1, 1, 1});
+
+    REQUIRE(ptr_to_111_chunk[0] == Approx(101010.0));
+    REQUIRE(ptr_to_111_chunk[1] == Approx(101011.0));
+    REQUIRE(ptr_to_111_chunk[7] == Approx(101017.0));
+    REQUIRE(ptr_to_111_chunk[10] == Approx(101110.0));
+    REQUIRE(ptr_to_111_chunk[12] == Approx(101112.0));
+
+    DataObjectFactory::destroy(ct_ptr);
+}
