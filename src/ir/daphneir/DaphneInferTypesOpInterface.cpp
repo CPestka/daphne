@@ -325,33 +325,6 @@ mlir::Type mlirTypeForCode(ZarrDatatype type, Builder builder) {
     }
 }
 
-mlir::Type mlirTypeForCode(ZarrDatatype type, Builder builder) {
-    switch(type) {
-        case ZarrDatatype::INT64:
-            return builder.getIntegerType(64, true);
-        case ZarrDatatype::INT32:
-            return builder.getIntegerType(32, true);
-        case ZarrDatatype::INT16:
-            return builder.getIntegerType(16, true);
-        case ZarrDatatype::INT8:
-            return builder.getIntegerType(8, true);
-        case ZarrDatatype::UINT64:
-            return builder.getIntegerType(64, false);
-        case ZarrDatatype::UINT32:
-            return builder.getIntegerType(32, false);
-        case ZarrDatatype::UINT16:
-            return builder.getIntegerType(16, false);
-        case ZarrDatatype::UINT8:
-            return builder.getIntegerType(8, false);
-        case ZarrDatatype::FP64:
-            return builder.getF64Type();
-        case ZarrDatatype::FP32:
-            return builder.getF32Type();
-        default:
-            throw std::runtime_error("mlirTypeForCode: unknown value type code");
-    }
-}
-
 std::vector<Type> daphne::ReadOp::inferTypes() {
     auto p = CompilerUtils::isConstant<std::string>(getFileName());
     Builder builder(getContext());
