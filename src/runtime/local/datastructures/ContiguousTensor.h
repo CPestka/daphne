@@ -40,7 +40,6 @@ class ContiguousTensor : public Tensor<ValueType> {
     ContiguousTensor(const std::vector<size_t> &tensor_shape, InitCode init_code)
         : Tensor<ValueType>::Tensor(tensor_shape),
           data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>()) {
-        spdlog::info("ContiguousTensor creation");
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
