@@ -93,6 +93,13 @@ namespace mlir::daphne {
     MatrixRepresentation stringToMatrixRepresentation(const std::string &str);
 }
 
+namespace mlir::daphne {
+    enum class TensorRepresentation {
+        Chunked = 0,
+        Contiguous = 1
+    };
+}
+
 // ... the following tablegen'erated headers.
 #define GET_TYPEDEF_CLASSES
 #include <ir/daphneir/DaphneOpsTypes.h.inc>

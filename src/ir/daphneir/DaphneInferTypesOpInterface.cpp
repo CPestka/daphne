@@ -379,7 +379,11 @@ std::vector<Type> daphne::ReadOp::inferTypes() {
             if (fmd.external) {
                 auto fmd = ZarrFileMetaDataParser::readMetaData(CompilerUtils::constantOrThrow<std::string>(getFileName()));
                 mlir::Type valType = mlirTypeForCode(fmd.data_type, builder);
-                return {mlir::daphne::TensorType::get(getContext(), valType)};
+                if (fmd.shape == fmd.chunks) {
+                    return {mlir::daphne::TensorType::get(getContext(), valType).withRepresentation(TensorRepresentation::Contiguous)};
+                } else {
+                    return {mlir::daphne::TensorType::get(getContext(), valType).withRepresentation(TensorRepresentation::Chunked)};
+                }
             } else {
                 mlir::Type valType = mlirTypeForCode(fmd.schema[0], builder);
                 return {mlir::daphne::TensorType::get(getContext(), valType)};
