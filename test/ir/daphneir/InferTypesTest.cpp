@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <compiler/inference/TypeInferenceUtils.h>
+#include <ir/daphneir/TypeInferenceUtils.h>
 
 #include <llvm/Support/raw_os_ostream.h>
 

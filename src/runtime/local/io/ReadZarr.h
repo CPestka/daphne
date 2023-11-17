@@ -24,6 +24,7 @@
 #include <vector>
 #include <fstream>
 #include <filesystem>
+#include <bit>
 
 #include <runtime/local/datastructures/ContiguousTensor.h>
 #include <runtime/local/datastructures/ChunkedTensor.h>
@@ -173,16 +174,15 @@ struct ReadZarr<ContiguousTensor<VT>> {
             throw std::runtime_error("ReadZarr->ContiguousTensor: Found more than one chunk");
         }
 
-        // No c++20....
-        // if ((std::endian::native != std::endian::little) && (std::endian::native != std::endian::big)) {
-        //     throw std::runtime_error(
-        //       "ReadZarr->ContiguousTensor: Native endianness that is not either little or big endian is not "
-        //       "supported.");
-        // }
+        if ((std::endian::native != std::endian::little) && (std::endian::native != std::endian::big)) {
+            throw std::runtime_error(
+              "ReadZarr->ContiguousTensor: Native endianness that is not either little or big endian is not "
+              "supported.");
+        }
 
-        // bool endianness_match =
-        //   ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
-        //   ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
+        bool endianness_match =
+          ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
+          ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
 
         for (size_t i = 0; i < full_chunk_file_paths.size(); i++) {
             // IO via STL -> Posix ; substitue io_uring calls here
@@ -200,9 +200,9 @@ struct ReadZarr<ContiguousTensor<VT>> {
                 throw std::runtime_error("ReadZarr->ContiguousTensor: failed to read chunk file.");
             }
 
-            // if (!endianness_match) {
-            //     ReverseArray(res->data.get(), total_elements);
-            // }
+            if (!endianness_match) {
+                ReverseArray(res->data.get(), total_elements);
+            }
         }
     }
 };
@@ -255,15 +255,15 @@ struct ReadZarr<ChunkedTensor<VT>> {
             }
         }
 
-        // if ((std::endian::native != std::endian::little) && (std::endian::native != std::endian::big)) {
-        //     throw std::runtime_error(
-        //       "ReadZarr->ChunkedTensor: Native endianness that is not either little or big endian is not "
-        //       "supported.");
-        // }
+        if ((std::endian::native != std::endian::little) && (std::endian::native != std::endian::big)) {
+            throw std::runtime_error(
+              "ReadZarr->ChunkedTensor: Native endianness that is not either little or big endian is not "
+              "supported.");
+        }
 
-        // bool endianness_match =
-        //   ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
-        //   ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
+        bool endianness_match =
+          ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
+          ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
 
         for (size_t i = 0; i < full_chunk_file_paths.size(); i++) {
             // IO via STL -> Posix ; substitude io_uring calls here
@@ -281,9 +281,9 @@ struct ReadZarr<ChunkedTensor<VT>> {
                 throw std::runtime_error("ReadZarr->ChunkedTensor: failed to read chunk file.");
             }
 
-            // if (!endianness_match) {
-            //     ReverseArray(res->data.get(), elements_per_chunk);
-            // }
+            if (!endianness_match) {
+                ReverseArray(res->data.get(), elements_per_chunk);
+            }
 
             res->chunk_materialization_flags[res->getLinearChunkIdFromChunkIds(chunk_ids[i])] = true;
         }
