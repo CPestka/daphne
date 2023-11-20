@@ -239,7 +239,7 @@ struct Distribute<ALLOCATION_TYPE::DIST_GRPC_SYNC, DT>
                 dynamic_cast<AllocationDescriptorGRPC&>(*(dp->allocation)).updateDistributedData(newData);
                 DataObjectFactory::destroy(slicedMat);
             });
-            threads_vector.push_back(move(t));            
+            threads_vector.push_back(std::move(t));            
         }
         for (auto &thread : threads_vector)
             thread.join();

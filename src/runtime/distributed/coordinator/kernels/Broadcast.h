@@ -275,7 +275,7 @@ struct Broadcast<ALLOCATION_TYPE::DIST_GRPC_SYNC, DT>
                 newData.isPlacedAtWorker = true;
                 dynamic_cast<AllocationDescriptorGRPC&>(*(dp->allocation)).updateDistributedData(newData);
             });
-            threads_vector.push_back(move(t));
+            threads_vector.push_back(std::move(t));
         }
         for (auto &thread : threads_vector)
             thread.join();

@@ -204,7 +204,7 @@ class ThetaJoin<Frame, Frame, Frame> {
               /// rhs
               positions->get(readOffset, 1));
             ++readOffset;
-            return std::move(res);
+            return res;
         }
         
         void finalize(){

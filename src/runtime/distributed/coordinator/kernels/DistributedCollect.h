@@ -242,7 +242,7 @@ struct DistributedCollect<ALLOCATION_TYPE::DIST_GRPC_SYNC, DT>
                 distributedData.isPlacedAtWorker = false;
                 dynamic_cast<AllocationDescriptorGRPC&>(*(dp->allocation)).updateDistributedData(distributedData);
             });
-            threads_vector.push_back(move(t));        
+            threads_vector.push_back(std::move(t));        
         }
         for (auto &thread : threads_vector)
             thread.join();

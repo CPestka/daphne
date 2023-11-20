@@ -259,7 +259,7 @@ struct DistributedCompute<ALLOCATION_TYPE::DIST_GRPC_SYNC, DTRes, const Structur
                     dynamic_cast<AllocationDescriptorGRPC&>(*(dp->allocation)).updateDistributedData(data);                                                
                 }
             });
-            threads_vector.push_back(move(t));           
+            threads_vector.push_back(std::move(t));           
         }
         for (auto &thread : threads_vector)
             thread.join();

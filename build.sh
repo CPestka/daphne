@@ -57,8 +57,9 @@ function printHelp {
     echo "  -y, --yes         Accept all prompts"
     echo "  --cuda            Compile with support for CUDA ops"
     echo "  --debug           Compile with support for debug mode"
+    echo "  --debugRelease    Compile with support for debugRelease mode"
     echo "  --fpgaopencl      Compile with support for Intel PAC D5005 FPGA"
-    echo " --mpi             Compile with support for MPI"
+    echo "  --mpi             Compile with support for MPI"
 }
 
 #******************************************************************************
@@ -499,6 +500,10 @@ while [[ $# -gt 0 ]]; do
     --debug)
         echo building DEBUG version
         export BUILD_DEBUG="-DCMAKE_BUILD_TYPE=Debug"
+        ;;
+    --debugRelease)
+        echo building RELEASE WITH DEBUG INFO version
+        export BUILD_DEBUG="-DCMAKE_BUILD_TYPE=RelWithDebInfo"
         ;;
     --installPrefix)
         installPrefix=$1
