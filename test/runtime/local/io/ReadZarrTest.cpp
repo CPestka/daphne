@@ -66,7 +66,7 @@ TEST_CASE("PartialReadZarr->ChunkedTensor", TAG_IO) {
     ChunkedTensor<double>* ct_ptr;
 
     // Read in [100,100,100] fp64 tensor with chunking [10,10,10]
-    partiallyReadZarr<ChunkedTensor<double>>(
+    readZarr<ChunkedTensor<double>>(
       ct_ptr, "./test/runtime/local/io/zarr_test/ChunkedTensorTest/example.zarr", {{0,19},{0,19},{0,19}});
 
     REQUIRE(ct_ptr->data[0] == Approx(0.0));

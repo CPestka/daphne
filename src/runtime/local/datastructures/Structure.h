@@ -23,6 +23,7 @@
 #include <map>
 #include <mutex>
 #include <array>
+#include <vector>
 
 /**
  * @brief The base class of all data structure implementations.
@@ -107,10 +108,7 @@ public:
         return numCols;
     }
 
-    [[nodiscard]] size_t getNumItems() const
-    {
-        return numRows * numCols;
-    }
+    virtual size_t getNumItems() const = 0;
 
     /**
      * @brief Prints a human-readable representation of this data object to the

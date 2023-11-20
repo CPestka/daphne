@@ -143,7 +143,6 @@ public:
      * See `append` for more details.
      */
     virtual void finishAppend() = 0;
-
 };
 
 #endif //SRC_RUNTIME_LOCAL_DATASTRUCTURES_MATRIX_H

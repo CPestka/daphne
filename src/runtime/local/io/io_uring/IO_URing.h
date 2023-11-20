@@ -1,3 +1,19 @@
+/*
+ * Copyright 2021 The DAPHNE Consortium
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #pragma once
 
 #include <asm-generic/errno-base.h>
@@ -11,19 +27,9 @@
 #include <liburing.h>
 
 #include "Container.h"
+#include "AsyncUtil.h"
 
 enum struct IO_OP_CODE : uint8_t { READ = 0, WRITE = 1 };
-
-enum struct IO_STATUS : uint8_t {
-    PRE_SUBMISSION,
-    IN_FLIGHT,
-    SUCCESS,
-    IO_ERROR,
-    ACCESS_DENIED,
-    BAD_FD,
-    OTHER_ERROR,
-    OUT_OF_SPACE,
-};
 
 struct URingRead {
     void *dest;

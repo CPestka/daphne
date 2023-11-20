@@ -318,6 +318,10 @@ public:
     }
     
     size_t serialize(std::vector<char> &buf) const override;
+
+    size_t getNumItems() const override {
+        return this->getNumRows() * this->getNumCols();
+    }
 };
 
 template <typename ValueType>
@@ -607,6 +611,10 @@ public:
                 if(strcmp(M.getValues()[M.pos(r,c)], values.get()[pos(r,c)]))
                     return false;
         return true;
+  }
+
+  size_t getNumItems() const override {
+        return this->getNumRows() * this->getNumCols();
   }
 
   size_t serialize(std::vector<char> &buf) const override {

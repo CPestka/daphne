@@ -52,6 +52,7 @@ class Tensor : public Structure {
     virtual ~Tensor() {};
 
     public:
+    
     // These pure virtual functions are only well defined for a ND-tensor in the
     // case of N=2
     // Use provided dice() function instead

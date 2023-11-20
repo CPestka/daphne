@@ -277,6 +277,10 @@ class ContiguousTensor : public Tensor<ValueType> {
         this->rank = this->tensor_shape.size();
     }
 
+    size_t getNumItems() const override {
+        return this->total_element_count;
+    }
+
     size_t serialize(std::vector<char> &buf) const override {
         // TODO
         return 0;

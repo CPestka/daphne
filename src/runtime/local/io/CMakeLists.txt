@@ -16,7 +16,7 @@ add_library(IO
         utils.cpp
         ZarrFileMetadata.cpp
 )
-target_link_libraries(IO)
+target_link_libraries(IO IO_URING_LIB)
 
 add_library(IO_URING_LIB INTERFACE)
 target_include_directories(IO_URING_LIB INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/io_uring)

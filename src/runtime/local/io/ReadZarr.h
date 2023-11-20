@@ -27,13 +27,13 @@
 #include <fstream>
 #include <filesystem>
 #include <bit>
-#include "IO_Threadpool.h"
-#include "IO_URing.h"
 
 #include <fcntl.h>
 #include <runtime/local/datastructures/ContiguousTensor.h>
 #include <runtime/local/datastructures/ChunkedTensor.h>
 #include <runtime/local/io/ZarrFileMetadata.h>
+#include <runtime/local/io/io_uring/IO_Threadpool.h>
+#include <runtime/local/io/io_uring/IO_URing.h>
 #include <parser/metadata/ZarrFileMetaDataParser.h>
 
 enum struct IO_TYPE { POSIX, IO_URING };
@@ -151,12 +151,7 @@ void CheckZarrMetaDataVT(ZarrDatatype read_type) {
 
 template<typename VT>
 struct ReadZarr<ContiguousTensor<VT>> {
-    static void apply(ContiguousTensor<VT> *&res, const char *filename, IO_TYPE io_type) {
-        if (io_type != IO_TYPE::POSIX) {
-            throw std::runtime_error(
-              "ReadZarr->ContiguousTensor: io_type currently may only be POSIX for a Contiguous tensor");
-        }
-
+    static void apply(ContiguousTensor<VT> *&res, const char *filename) {
         auto fmd = ZarrFileMetaDataParser::readMetaData(filename);
 
         if (fmd.chunks != fmd.shape) {
@@ -246,7 +241,7 @@ struct ReadZarr<ContiguousTensor<VT>> {
 
 template<typename VT>
 struct ReadZarr<ChunkedTensor<VT>> {
-    static void apply(ChunkedTensor<VT> *&res, const char *filename, IO_TYPE io_type) {
+    static void apply(ChunkedTensor<VT> *&res, const char *filename) {
         auto fmd = ZarrFileMetaDataParser::readMetaData(filename);
 
         if (fmd.shape.size() == 0) {
@@ -302,33 +297,32 @@ struct ReadZarr<ChunkedTensor<VT>> {
           ((std::endian::native == std::endian::big) && (byte_order == ByteOrder::BIGENDIAN)) ||
           ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
 
-        if
-            // For all requested chunks open the respective file, fetch the ptr to the chunks location in the chunked
-            // tensor and directly read into it
-            for (size_t i = 0; i < full_chunk_file_paths.size(); i++) {
-                // IO via STL -> Posix ; substitude io_uring calls here
-                std::ifstream f;
-                f.open(full_chunk_file_paths[i], std::ios::in | std::ios::binary);
+        // For all requested chunks open the respective file, fetch the ptr to the chunks location in the chunked
+        // tensor and directly read into it
+        for (size_t i = 0; i < full_chunk_file_paths.size(); i++) {
+            // IO via STL -> Posix ; substitude io_uring calls here
+            std::ifstream f;
+            f.open(full_chunk_file_paths[i], std::ios::in | std::ios::binary);
 
-                if (!f.good()) {
-                    throw std::runtime_error("ReadZarr->ChunkedTensor: failed to open chunk file.");
-                }
-
-                uint64_t amount_of_bytes_to_read = sizeof(VT) * elements_per_chunk;
-                f.read(reinterpret_cast<char *>(res->getPtrToChunk(chunk_ids[i])), amount_of_bytes_to_read);
-
-                if (!f.good()) {
-                    throw std::runtime_error("ReadZarr->ChunkedTensor: failed to read chunk file.");
-                }
-
-                // Files endianness does not match the native endianness -> byte reverse every read element in the read
-                // chunk
-                if (!endianness_match) {
-                    ReverseArray(res->data.get(), elements_per_chunk);
-                }
-
-                res->chunk_materialization_flags[res->getLinearChunkIdFromChunkIds(chunk_ids[i])] = true;
+            if (!f.good()) {
+                throw std::runtime_error("ReadZarr->ChunkedTensor: failed to open chunk file.");
             }
+
+            uint64_t amount_of_bytes_to_read = sizeof(VT) * elements_per_chunk;
+            f.read(reinterpret_cast<char *>(res->getPtrToChunk(chunk_ids[i])), amount_of_bytes_to_read);
+
+            if (!f.good()) {
+                throw std::runtime_error("ReadZarr->ChunkedTensor: failed to read chunk file.");
+            }
+
+            // Files endianness does not match the native endianness -> byte reverse every read element in the read
+            // chunk
+            if (!endianness_match) {
+                ReverseArray(res->data.get(), elements_per_chunk);
+            }
+
+            res->chunk_materialization_flags[res->getLinearChunkIdFromChunkIds(chunk_ids[i])] = true;
+        }
     }
 };
 
@@ -550,7 +544,7 @@ struct PartialReadZarr<ChunkedTensor<VT>> {
           ((std::endian::native == std::endian::little) && (byte_order == ByteOrder::LITTLEENDIAN));
 
         std::vector<URingRead> read_requests;
-        std::vector<std::atomic<IO_STATUS>*> io_futures;
+        std::vector<std::atomic<IO_STATUS> *> io_futures;
         read_requests.resize(full_requested_chunk_file_paths.size());
         io_futures.resize(full_requested_chunk_file_paths.size());
         for (size_t i = 0; i < full_requested_chunk_file_paths.size(); i++) {
@@ -565,14 +559,15 @@ struct PartialReadZarr<ChunkedTensor<VT>> {
 
             if (status < 0) {
                 int err = errno;
-                throw std::runtime_error(
-              "PartialReadZarr->ChunkedTensor: Opening chunk file failed. Errno: " + std::string(strerror(err)));
+                throw std::runtime_error("PartialReadZarr->ChunkedTensor: Opening chunk file failed. Errno: " +
+                                         std::string(strerror(err)));
             }
 
-            read_requests[i] = {res->getLinearChunkIdFromChunkIds(requested_chunk_ids.value()[i]), amount_of_bytes_to_read, 0, status};
-            AsyncIOInfo* chunk_async_io_info = res->chunk_io_futures[res->getLinearChunkIdFromChunkIds(requested_chunk_ids.value()[i])];
+            read_requests[i] = {
+              res->getLinearChunkIdFromChunkIds(requested_chunk_ids.value()[i]), amount_of_bytes_to_read, 0, status};
+            AsyncIOInfo *chunk_async_io_info         = res->GetAsyncIOInfo(requested_chunk_ids);
             chunk_async_io_info->needs_byte_reversal = !endianness_match;
-            io_futures[i] = &(chunk_async_io_info->status);
+            io_futures[i]                            = &(chunk_async_io_info->status);
         }
 
         io_uring_pool->SubmitReads(read_requests, io_futures);

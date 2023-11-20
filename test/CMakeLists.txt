@@ -156,7 +156,7 @@ add_dependencies(run_tests daphne daphnelib DistributedWorker daphne-opt)
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 set(LIBS AllKernels ${dialect_libs} DataStructures DaphneDSLParser MLIRDaphne WorkerImpl Proto DaphneConfigParser
-        DaphneMetaDataParser Util IO_URING_LIB)
+        DaphneMetaDataParser Util IO)
 
 if(USE_CUDA AND CMAKE_CUDA_COMPILER)
     target_include_directories(run_tests PUBLIC ${CUDAToolkit_INCLUDE_DIRS})

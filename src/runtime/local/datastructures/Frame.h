@@ -481,7 +481,10 @@ public:
         return true;
     }
 
-    
+    size_t getNumItems() const override {
+        return this->getNumRows() * this->getNumCols();
+    }
+
     size_t serialize(std::vector<char> &buf) const override;
 };
 

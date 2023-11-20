@@ -23,6 +23,7 @@
 #include <tags.h>
 
 #include <catch.hpp>
+#include "AsyncUtil.h"
 
 #include <IO_Threadpool.h>
 #include <IO_URing.h>
@@ -74,11 +75,11 @@ TEST_CASE("io_uring basic File R/W test", TAG_IO) {
     std::vector<URingRead> read_requests;
     read_requests.push_back({result_page.get(), 4096, 0, fd});
 
-    std::unique_ptr<URingReadResult[]> read_future = io_pool.SubmitReads(read_requests);
+    std::unique_ptr<std::atomic<IO_STATUS>[]> read_future = io_pool.SubmitReads(read_requests);
 
     timed_out = false;
     start     = std::chrono::high_resolution_clock::now();
-    while (read_future[0].status == IO_STATUS::IN_FLIGHT) {
+    while (read_future[0] == IO_STATUS::IN_FLIGHT) {
         if (static_cast<uint64_t>(
               std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
                 .count()) > 3000) {
@@ -88,7 +89,7 @@ TEST_CASE("io_uring basic File R/W test", TAG_IO) {
     }
     REQUIRE(!timed_out);
 
-    REQUIRE(read_future[0].status == IO_STATUS::SUCCESS);
+    REQUIRE(read_future[0] == IO_STATUS::SUCCESS);
 
     for (size_t i = 0; i < (4096 / sizeof(uint64_t)); i++) {
         REQUIRE(result_page[i] == 42);
