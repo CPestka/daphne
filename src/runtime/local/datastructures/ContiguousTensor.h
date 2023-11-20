@@ -123,7 +123,7 @@ class ContiguousTensor : public Tensor<ValueType> {
 
     void printValue(std::ostream &os, ValueType val) const;
 
-    bool operator==(const ContiguousTensor<ValueType> &rhs) {
+    bool operator==(const ContiguousTensor<ValueType> &rhs) const {
         if (this->tensor_shape != rhs.tensor_shape) {
             return false;
         }
