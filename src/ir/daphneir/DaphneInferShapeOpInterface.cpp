@@ -233,6 +233,9 @@ std::vector<std::vector<ssize_t>> daphne::ReadOp::inferShape() {
             return {{-1, -1, -1}};
         }
     }
+
+    throw std::runtime_error("Supposedly unreachable");
+    return {};
 }
 
 std::vector<std::vector<ssize_t>> daphne::OrderOp::inferShape() {
@@ -593,4 +596,7 @@ std::vector<std::vector<ssize_t>> daphne::tryInferShape(Operation* op) {
         //     shapes.push_back({-1, -1});
         // return shapes;
     }
+
+    throw std::runtime_error("Supposedly unreachable");
+    return {};
 }

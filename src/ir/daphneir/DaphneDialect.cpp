@@ -213,6 +213,9 @@ mlir::Type mlir::daphne::DaphneDialect::parseType(mlir::DialectAsmParser &parser
         parser.emitError(parser.getCurrentLocation()) << "Parsing failed, keyword `" << keyword << "` not recognized!";
         return nullptr;
     }
+
+    throw std::runtime_error("Supposedly unreachable");
+    return nullptr;
 }
 
 std::string unknownStrIf(ssize_t val) {
