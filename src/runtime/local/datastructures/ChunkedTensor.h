@@ -374,23 +374,31 @@ class ChunkedTensor : public Tensor<ValueType> {
             }
         }
 
-        size_t total_chunk_count = std::get<1>(element_id_ranges[0]) - std::get<0>(element_id_ranges[0]) + 1;
+        std::vector<std::pair<size_t, size_t>> chunk_id_ranges;
+        chunk_id_ranges.resize(this->rank);
         for (size_t i = 0; i < this->rank; i++) {
-            total_chunk_count *= (std::get<1>(element_id_ranges[i]) - std::get<0>(element_id_ranges[i]) + 1);
+            chunk_id_ranges[i] = {std::get<0>(element_id_ranges[i]) / chunk_shape[i],
+                                  std::get<1>(element_id_ranges[i]) / chunk_shape[i]};
+        }
+
+        size_t total_chunk_count = std::get<1>(chunk_id_ranges[0]) - std::get<0>(chunk_id_ranges[0]) + 1;
+        for (size_t i = 1; i < this->rank; i++) {
+            total_chunk_count *= (std::get<1>(chunk_id_ranges[i]) - std::get<0>(chunk_id_ranges[i]) + 1);
         }
 
         std::vector<size_t> strides;
         strides.push_back(1);
-        for (size_t i = 0; i < (this->rank - 1); i++) {
-            strides.push_back(std::get<1>(element_id_ranges[i]) - std::get<0>(element_id_ranges[i]) + 1);
+        for (size_t i = 1; i < this->rank; i++) {
+            strides.push_back(strides[i-1] * (std::get<1>(chunk_id_ranges[i-1]) - std::get<0>(chunk_id_ranges[i-1]) + 1));
         }
 
         std::vector<std::vector<size_t>> chunk_id_list;
         chunk_id_list.resize(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
             int64_t tmp = i;
+            chunk_id_list[i].resize(this->rank);
             for (int64_t j = (this->rank - 1); j >= 0; j--) {
-                chunk_id_list[i][static_cast<size_t>(j)] = std::get<0>(element_id_ranges[j]) + (tmp / strides[j]);
+                chunk_id_list[i][static_cast<size_t>(j)] = std::get<0>(chunk_id_ranges[j]) + (tmp / strides[j]);
                 tmp                                      = tmp % strides[j];
             }
         }

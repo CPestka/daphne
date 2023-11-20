@@ -381,8 +381,8 @@ struct PartialReadZarr<ChunkedTensor<VT>> {
         full_requested_chunk_file_paths.reserve(requested_chunk_ids.value().size());
         for (size_t i = 0; i < requested_chunk_ids.value().size(); i++) {
             bool found_file_match_for_requested_chunk = false;
-            for (size_t j = 0; j < full_chunk_file_paths.size(); j++) {
-                if (chunk_ids[i] == requested_chunk_ids.value()[j]) {
+            for (size_t j = 0; j < chunk_ids.size(); j++) {
+                if (requested_chunk_ids.value()[i] == chunk_ids[j]) {
                     found_file_match_for_requested_chunk = true;
                     full_requested_chunk_file_paths.push_back(full_chunk_file_paths[j]);
 
