@@ -25,10 +25,17 @@
 #include <ostream>
 #include <tuple>
 #include <vector>
+#include "IO_URing.h"
 
 #include <runtime/local/datastructures/ContiguousTensor.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/Tensor.h>
+#include <runtime/local/io/IO_URing.h>
+
+struct AsyncIOInfo {
+    std::atomic<IO_STATUS> status;
+    bool needs_byte_reversal;
+};
 
 template<typename ValueType>
 class ChunkedTensor : public Tensor<ValueType> {
@@ -45,6 +52,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     size_t total_chunk_count;
 
     std::unique_ptr<std::atomic<bool>[]> chunk_materialization_flags;
+    std::unique_ptr<std::atomic<AsyncIOInfo>[]> chunk_io_futures;
 
     std::shared_ptr<ValueType[]> data;
 
@@ -82,6 +90,10 @@ class ChunkedTensor : public Tensor<ValueType> {
         data = std::shared_ptr<ValueType[]>(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>());
 
         chunk_materialization_flags = std::make_unique<std::atomic<bool>[]>(total_chunk_count);
+        chunk_io_futures = std::make_unique<std::atomic<AsyncIOInfo>[]>(total_chunk_count);
+        for (size_t i = 0; i < total_chunk_count; i++) {
+                chunk_io_futures[i] = {IO_STATUS::PRE_SUBMISSION, false};
+        }
 
         switch (init_code) {
             case InitCode::NONE:
@@ -158,6 +170,10 @@ class ChunkedTensor : public Tensor<ValueType> {
         for (size_t i = 0; i < total_chunk_count; i++) {
             chunk_materialization_flags[i] = other->chunk_materialization_flags[i];
         }
+        chunk_io_futures = std::make_unique<std::atomic<AsyncIOInfo>[]>(total_chunk_count);
+        for (size_t i = 0; i < total_chunk_count; i++) {
+                chunk_io_futures[i] = {IO_STATUS::PRE_SUBMISSION, false};
+        }
         std::memcpy(data.get(), other->data.get(), total_size_in_elements * sizeof(ValueType));
     }
 
@@ -184,8 +200,10 @@ class ChunkedTensor : public Tensor<ValueType> {
         }
 
         chunk_materialization_flags = std::make_unique<std::atomic<bool>[]>(total_chunk_count);
+        chunk_io_futures = std::make_unique<std::atomic<AsyncIOInfo>[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
             chunk_materialization_flags[i] = true;
+                chunk_io_futures[i] = {IO_STATUS::PRE_SUBMISSION, false};;
         }
     }
 
@@ -223,6 +241,10 @@ class ChunkedTensor : public Tensor<ValueType> {
         chunk_materialization_flags = std::make_unique<std::atomic<bool>[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
             chunk_materialization_flags[i] = true;
+        }
+        chunk_io_futures = std::make_unique<std::atomic<AsyncIOInfo>[]>(total_chunk_count);
+        for (size_t i = 0; i < total_chunk_count; i++) {
+                chunk_io_futures[i] = {IO_STATUS::PRE_SUBMISSION, false};;
         }
     }
 

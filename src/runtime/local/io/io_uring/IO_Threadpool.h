@@ -66,8 +66,8 @@ struct IOThreadpool {
         }
     }
 
-    std::unique_ptr<URingReadResult[]> SubmitReads(std::vector<URingRead> &reads) {
-        std::unique_ptr<URingReadResult[]> results = std::make_unique<URingReadResult[]>(reads.size());
+    std::unique_ptr<std::atomic<IO_STATUS>[]> SubmitReads(const std::vector<URingRead> &reads) {
+        std::unique_ptr<std::atomic<IO_STATUS>[]> results = std::make_unique<std::atomic<IO_STATUS>[]>(reads.size());
 
         uint64_t reads_per_ring =
           reads.size() % runners.size() == 0 ? reads.size() / runners.size() : 1 + (reads.size() / runners.size());
@@ -80,13 +80,13 @@ struct IOThreadpool {
             std::vector<URingReadInternal> ring_read_batch;
             ring_read_batch.resize(current_read_batch);
             for (uint64_t j = 0; j < current_read_batch; j++) {
-                ring_read_batch[j]                 = {reads[j + current_offset].dest,
-                                                      reads[j + current_offset].dest,
-                                                      reads[j + current_offset].size,
-                                                      reads[j + current_offset].offset,
-                                                      reads[j + current_offset].fd,
-                                                      &(results[j + current_offset])};
-                results[j + current_offset].result = reads[j + current_offset].dest;
+                ring_read_batch[j]          = {reads[j + current_offset].dest,
+                                               reads[j + current_offset].dest,
+                                               reads[j + current_offset].size,
+                                               reads[j + current_offset].offset,
+                                               reads[j + current_offset].fd,
+                                               &(results[j + current_offset])};
+                results[j + current_offset] = IO_STATUS::IN_FLIGHT;
             }
 
             current_offset += current_read_batch;
@@ -111,12 +111,13 @@ struct IOThreadpool {
             ring_write_batch.resize(current_write_batch);
 
             for (uint64_t j = 0; j < current_write_batch; j++) {
-                ring_write_batch[j] = {writes[j + current_offset].src,
-                                       writes[j + current_offset].src,
-                                       writes[j + current_offset].size,
-                                       writes[j + current_offset].offset,
-                                       writes[j + current_offset].fd,
-                                       &(results[j + current_offset])};
+                ring_write_batch[j]         = {writes[j + current_offset].src,
+                                               writes[j + current_offset].src,
+                                               writes[j + current_offset].size,
+                                               writes[j + current_offset].offset,
+                                               writes[j + current_offset].fd,
+                                               &(results[j + current_offset])};
+                results[j + current_offset] = IO_STATUS::IN_FLIGHT;
             }
 
             current_offset += current_write_batch;
@@ -125,5 +126,59 @@ struct IOThreadpool {
         }
 
         return results;
+    }
+
+    void SubmitReads(const std::vector<URingRead> &reads, std::vector<std::atomic<IO_STATUS> *> &results) {
+        uint64_t reads_per_ring =
+          reads.size() % runners.size() == 0 ? reads.size() / runners.size() : 1 + (reads.size() / runners.size());
+
+        uint64_t current_offset = 0;
+        for (size_t i = 0; i < runners.size(); i++) {
+            uint64_t current_read_batch =
+              (reads.size() - current_offset) > reads_per_ring ? (reads.size() - current_offset) : reads_per_ring;
+
+            std::vector<URingReadInternal> ring_read_batch;
+            ring_read_batch.resize(current_read_batch);
+            for (uint64_t j = 0; j < current_read_batch; j++) {
+                ring_read_batch[j]           = {reads[j + current_offset].dest,
+                                                reads[j + current_offset].dest,
+                                                reads[j + current_offset].size,
+                                                reads[j + current_offset].offset,
+                                                reads[j + current_offset].fd,
+                                                results[j + current_offset]};
+                *results[j + current_offset] = IO_STATUS::IN_FLIGHT;
+            }
+
+            current_offset += current_read_batch;
+
+            runners[i]->ring.Enqueue(ring_read_batch);
+        }
+    }
+
+    void SubmitWrites(const std::vector<URingWrite> &writes, std::vector<std::atomic<IO_STATUS> *> &results) {
+        uint64_t writes_per_ring =
+          writes.size() % runners.size() == 0 ? writes.size() / runners.size() : 1 + (writes.size() / runners.size());
+
+        uint64_t current_offset = 0;
+        for (size_t i = 0; i < runners.size(); i++) {
+            uint64_t current_write_batch =
+              (writes.size() - current_offset) > writes_per_ring ? (writes.size() - current_offset) : writes_per_ring;
+            std::vector<URingWriteInternal> ring_write_batch;
+            ring_write_batch.resize(current_write_batch);
+
+            for (uint64_t j = 0; j < current_write_batch; j++) {
+                ring_write_batch[j]          = {writes[j + current_offset].src,
+                                                writes[j + current_offset].src,
+                                                writes[j + current_offset].size,
+                                                writes[j + current_offset].offset,
+                                                writes[j + current_offset].fd,
+                                                results[j + current_offset]};
+                *results[j + current_offset] = IO_STATUS::IN_FLIGHT;
+            }
+
+            current_offset += current_write_batch;
+
+            runners[i]->ring.Enqueue(ring_write_batch);
+        }
     }
 };

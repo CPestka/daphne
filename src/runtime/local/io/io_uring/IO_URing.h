@@ -15,6 +15,7 @@
 enum struct IO_OP_CODE : uint8_t { READ = 0, WRITE = 1 };
 
 enum struct IO_STATUS : uint8_t {
+    PRE_SUBMISSION,
     IN_FLIGHT,
     SUCCESS,
     IO_ERROR,
@@ -22,11 +23,6 @@ enum struct IO_STATUS : uint8_t {
     BAD_FD,
     OTHER_ERROR,
     OUT_OF_SPACE,
-};
-
-struct URingReadResult {
-    std::atomic<IO_STATUS> status;
-    void *result;
 };
 
 struct URingRead {
@@ -42,7 +38,7 @@ struct URingReadInternal {
     uint64_t remaining_size;
     uint64_t offset;
     int fd;
-    URingReadResult *result;
+    std::atomic<IO_STATUS>* status;
 };
 
 struct URingWrite {
@@ -58,7 +54,7 @@ struct URingWriteInternal {
     uint64_t remaining_size;
     uint64_t offset;
     int fd;
-    std::atomic<IO_STATUS> *write_status;
+    std::atomic<IO_STATUS> *status;
 };
 
 struct InFilghtSQE {
@@ -233,7 +229,7 @@ struct URing {
             in_flight_SQEs.data[current_slot_id] = {reads[i].initial_dest,
                                                     reads[i].current_dest,
                                                     reads[i].remaining_size,
-                                                    reads[i].result,
+                                                    reads[i].status,
                                                     reads[i].offset,
                                                     reads[i].fd,
                                                     IO_OP_CODE::READ};
@@ -333,7 +329,7 @@ struct URing {
             in_flight_SQEs.data[current_slot_id] = {writes[i].initial_dest,
                                                     writes[i].current_dest,
                                                     writes[i].remaining_size,
-                                                    writes[i].write_status,
+                                                    writes[i].status,
                                                     writes[i].offset,
                                                     writes[i].fd,
                                                     IO_OP_CODE::WRITE};
@@ -344,7 +340,7 @@ struct URing {
     void HandleRead(uint64_t slot_id, int32_t cqe_res) {
         InFilghtSQE in_flight_request = in_flight_SQEs.Extract(slot_id);
 
-        URingReadResult *result = static_cast<URingReadResult *>(in_flight_request.result);
+        std::atomic<IO_STATUS>* status = static_cast<std::atomic<IO_STATUS>*>(in_flight_request.result);
 
         // Either request fully or partially fullfilled
         if (cqe_res > 0) {
@@ -355,27 +351,27 @@ struct URing {
                                         in_flight_request.remaining_size - cqe_res,
                                         in_flight_request.offset,
                                         in_flight_request.fd,
-                                        reinterpret_cast<URingReadResult *>(in_flight_request.result)});
+                                        reinterpret_cast<std::atomic<IO_STATUS>*>(in_flight_request.result)});
                 return;
             }
 
-            result->status = IO_STATUS::SUCCESS;
+            *status = IO_STATUS::SUCCESS;
             return;
         }
 
         // Zero progress returns are also considered errors
         switch (-cqe_res) {
             case EIO:
-                result->status = IO_STATUS::IO_ERROR;
+                *status = IO_STATUS::IO_ERROR;
                 return;
             case EFAULT:
-                result->status = IO_STATUS::ACCESS_DENIED;
+                *status = IO_STATUS::ACCESS_DENIED;
                 return;
             case EBADF:
-                result->status = IO_STATUS::BAD_FD;
+                *status = IO_STATUS::BAD_FD;
                 return;
             default:
-                result->status = IO_STATUS::OTHER_ERROR;
+                *status = IO_STATUS::OTHER_ERROR;
                 return;
         }
     }
