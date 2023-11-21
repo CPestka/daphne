@@ -33,7 +33,7 @@
 
 struct AsyncIOInfo {
     std::atomic<IO_STATUS> status = IO_STATUS::PRE_SUBMISSION;
-    bool needs_byte_reversal = false;
+    bool needs_byte_reversal      = false;
 };
 
 template<typename ValueType>
@@ -51,7 +51,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     size_t total_chunk_count;
 
     std::unique_ptr<std::atomic<bool>[]> chunk_materialization_flags;
-    std::unique_ptr<AsyncIOInfo*[]> chunk_io_futures;
+    std::unique_ptr<AsyncIOInfo[]> chunk_io_futures;
 
     std::shared_ptr<ValueType[]> data;
 
@@ -89,9 +89,10 @@ class ChunkedTensor : public Tensor<ValueType> {
         data = std::shared_ptr<ValueType[]>(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>());
 
         chunk_materialization_flags = std::make_unique<std::atomic<bool>[]>(total_chunk_count);
-        chunk_io_futures = std::make_unique<AsyncIOInfo*[]>(total_chunk_count);
+        chunk_io_futures            = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
-                chunk_io_futures[i] = nullptr;
+            chunk_io_futures[i].needs_byte_reversal = false;
+            chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
         }
 
         switch (init_code) {
@@ -169,9 +170,10 @@ class ChunkedTensor : public Tensor<ValueType> {
         for (size_t i = 0; i < total_chunk_count; i++) {
             chunk_materialization_flags[i] = static_cast<bool>(other->chunk_materialization_flags[i]);
         }
-        chunk_io_futures = std::make_unique<AsyncIOInfo*[]>(total_chunk_count);
+        chunk_io_futures = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
-            chunk_io_futures[i] = nullptr;
+            chunk_io_futures[i].needs_byte_reversal = false;
+            chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
         }
         std::memcpy(data.get(), other->data.get(), total_size_in_elements * sizeof(ValueType));
     }
@@ -199,10 +201,11 @@ class ChunkedTensor : public Tensor<ValueType> {
         }
 
         chunk_materialization_flags = std::make_unique<std::atomic<bool>[]>(total_chunk_count);
-        chunk_io_futures = std::make_unique<AsyncIOInfo*[]>(total_chunk_count);
+        chunk_io_futures            = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
             chunk_materialization_flags[i] = true;
-                chunk_io_futures[i] = nullptr;
+            chunk_io_futures[i].needs_byte_reversal = false;
+            chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
         }
     }
 
@@ -241,19 +244,14 @@ class ChunkedTensor : public Tensor<ValueType> {
         for (size_t i = 0; i < total_chunk_count; i++) {
             chunk_materialization_flags[i] = true;
         }
-        chunk_io_futures = std::make_unique<AsyncIOInfo*[]>(total_chunk_count);
+        chunk_io_futures = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
-                chunk_io_futures[i] = nullptr;
+            chunk_io_futures[i].needs_byte_reversal = false;
+            chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
         }
     }
 
-    ~ChunkedTensor() override {
-        for (size_t i = 0; i < total_chunk_count; i++) {
-            if (chunk_io_futures[i] != nullptr) {
-                free(chunk_io_futures[i]);
-            }
-        }
-    }
+    ~ChunkedTensor() override {};
 
     void printValue(std::ostream &os, ValueType val) const;
 
@@ -379,8 +377,8 @@ class ChunkedTensor : public Tensor<ValueType> {
         std::vector<std::pair<size_t, size_t>> chunk_id_ranges;
         chunk_id_ranges.reserve(this->rank);
         for (size_t i = 0; i < this->rank; i++) {
-            chunk_id_ranges.push_back(
-              {std::get<0>(element_id_ranges[i]) / chunk_shape[i], 1 + (std::get<1>(element_id_ranges[i]) / chunk_shape[i])});
+            chunk_id_ranges.push_back({std::get<0>(element_id_ranges[i]) / chunk_shape[i],
+                                       1 + (std::get<1>(element_id_ranges[i]) / chunk_shape[i])});
         }
         return chunk_id_ranges;
     }
@@ -422,7 +420,8 @@ class ChunkedTensor : public Tensor<ValueType> {
         std::vector<size_t> strides;
         strides.push_back(1);
         for (size_t i = 1; i < this->rank; i++) {
-            strides.push_back(strides[i-1] * (std::get<1>(chunk_id_ranges[i-1]) - std::get<0>(chunk_id_ranges[i-1]) + 1));
+            strides.push_back(strides[i - 1] *
+                              (std::get<1>(chunk_id_ranges[i - 1]) - std::get<0>(chunk_id_ranges[i - 1]) + 1));
         }
 
         std::vector<std::vector<size_t>> chunk_id_list;
@@ -914,8 +913,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     }
 
     // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
-    ContiguousTensor<ValueType> *tryDiceToContiguousTensor(
-      std::vector<std::pair<size_t, size_t>> index_ranges) const {
+    ContiguousTensor<ValueType> *tryDiceToContiguousTensor(std::vector<std::pair<size_t, size_t>> index_ranges) const {
         if (index_ranges.size() != this->rank) {
             return nullptr;
         }
@@ -976,16 +974,8 @@ class ChunkedTensor : public Tensor<ValueType> {
         return new_tensor;
     }
 
-    AsyncIOInfo* GetAsyncIOInfo(const std::vector<size_t>& chunk_ids) {
-        AsyncIOInfo* info = chunk_io_futures[getLinearChunkIdFromChunkIds(chunk_ids)];
-        if (info != nullptr) {
-            return info;
-        }
-
-        info = static_cast<AsyncIOInfo*>(malloc(sizeof(AsyncIOInfo)));
-        info->status = IO_STATUS::PRE_SUBMISSION;
-        info->needs_byte_reversal = false;
-        return info;
+    AsyncIOInfo *GetAsyncIOInfo(const std::vector<size_t> &chunk_ids) {
+        return &(chunk_io_futures[getLinearChunkIdFromChunkIds(chunk_ids)]);
     }
 
     // Prints elements in logical layout
