@@ -228,12 +228,14 @@ class ContiguousTensor : public Tensor<ValueType> {
         os << std::endl;
     }
 
-    // Ranges are inclusive on both boundaries
-    ContiguousTensor<ValueType> *tryDice(const std::vector<std::pair<size_t, size_t>> &index_ranges) const {
+    // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
+    ContiguousTensor<ValueType> *tryDice(std::vector<std::pair<size_t, size_t>> index_ranges) const {
         if (index_ranges.size() != this->rank) {
             return nullptr;
         }
+        
         for (size_t i = 0; i < this->rank; i++) {
+            index_ranges[i] = {std::get<0>(index_ranges[i]), std::get<1>(index_ranges[i]) - 1};
             if (std::get<0>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<1>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<0>(index_ranges[i]) > std::get<1>(index_ranges[i])) {

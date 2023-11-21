@@ -108,7 +108,7 @@ MAKE_EW_UNARY_SCA(UnaryOpCode::SIGN, (arg == 0) ? 0 : ((arg < 0) ? -1 : ((arg > 
 MAKE_EW_UNARY_SCA(UnaryOpCode::SQRT, sqrt(arg));
 MAKE_EW_UNARY_SCA(UnaryOpCode::EXP, exp(arg));
 // Rounding.
-MAKE_EW_UNARY_SCA(UnaryOpCode::ABS, abs(arg));
+MAKE_EW_UNARY_SCA(UnaryOpCode::ABS, std::abs(arg));
 MAKE_EW_UNARY_SCA(UnaryOpCode::FLOOR, floor(arg));
 MAKE_EW_UNARY_SCA(UnaryOpCode::CEIL, std::ceil(arg));
 MAKE_EW_UNARY_SCA(UnaryOpCode::ROUND, round(arg));

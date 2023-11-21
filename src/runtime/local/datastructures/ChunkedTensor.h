@@ -164,10 +164,10 @@ class ChunkedTensor : public Tensor<ValueType> {
           chunk_element_count(other->chunk_element_count), chunk_strides(other->chunk_strides),
           intra_chunk_strides(other->intra_chunk_strides), chunks_per_dim(other->chunks_per_dim),
           total_size_in_elements(other->total_size_in_elements), total_chunk_count(other->total_chunk_count),
+          chunk_materialization_flags(std::make_unique<std::atomic<bool>[]>(total_chunk_count)),
           data(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>()) {
-        chunk_materialization_flags = std::make_unique<std::atomic<bool>[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
-            chunk_materialization_flags[i] = other->chunk_materialization_flags[i];
+            chunk_materialization_flags[i] = static_cast<bool>(other->chunk_materialization_flags[i]);
         }
         chunk_io_futures = std::make_unique<AsyncIOInfo*[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
@@ -177,7 +177,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     }
 
     ChunkedTensor(DenseMatrix<ValueType> *matrix, size_t chunk_size_x, size_t chunk_size_y)
-        : Tensor<ValueType>::Tensor(matrix->numRows, matrix->numCols) {
+        : Tensor<ValueType>::Tensor(matrix->getNumRows(), matrix->getNumCols()) {
         chunk_shape         = {chunk_size_x, chunk_size_y};
         chunk_element_count = chunk_size_x * chunk_size_y;
         chunks_per_dim      = {this->tensor_shape[0] % chunk_size_x == 0 ? this->tensor_shape[0] / chunk_size_x
@@ -255,13 +255,15 @@ class ChunkedTensor : public Tensor<ValueType> {
         }
     }
 
+    void printValue(std::ostream &os, ValueType val) const;
+
     bool operator==(const ChunkedTensor<ValueType> &rhs) const {
         if (this->tensor_shape != rhs.tensor_shape || chunk_shape != rhs.chunk_shape) {
             return false;
         }
 
         for (size_t i = 0; i < total_chunk_count; i++) {
-            if (chunk_materialization_flags[i] != rhs->chunk_materialization_flags[i]) {
+            if (chunk_materialization_flags[i] != rhs.chunk_materialization_flags[i]) {
                 return false;
             }
         }
@@ -355,14 +357,16 @@ class ChunkedTensor : public Tensor<ValueType> {
         return chunk_ids;
     }
 
+    // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
     std::optional<std::vector<std::pair<size_t, size_t>>> GetChunkRangeFromIdRange(
-      const std::vector<std::pair<size_t, size_t>> &element_id_ranges) {
+      std::vector<std::pair<size_t, size_t>> element_id_ranges) {
         if (element_id_ranges.size() != this->rank) {
             return std::nullopt;
         }
 
         // Bounds check ranges
         for (size_t i = 0; i < this->rank; i++) {
+            element_id_ranges[i] = {std::get<0>(element_id_ranges[i]), std::get<1>(element_id_ranges[i]) - 1};
             if ((std::get<0>(element_id_ranges[i]) > std::get<1>(element_id_ranges[i])) ||
                 (std::get<0>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
                 (std::get<0>(element_id_ranges[i]) < 0) ||
@@ -376,13 +380,14 @@ class ChunkedTensor : public Tensor<ValueType> {
         chunk_id_ranges.reserve(this->rank);
         for (size_t i = 0; i < this->rank; i++) {
             chunk_id_ranges.push_back(
-              {std::get<0>(element_id_ranges[i]) / chunk_shape[i], std::get<1>(element_id_ranges[i]) / chunk_shape[i]});
+              {std::get<0>(element_id_ranges[i]) / chunk_shape[i], 1 + (std::get<1>(element_id_ranges[i]) / chunk_shape[i])});
         }
         return chunk_id_ranges;
     }
 
+    // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
     std::optional<std::vector<std::vector<size_t>>> GetChunkListFromIdRange(
-      const std::vector<std::pair<size_t, size_t>> &element_id_ranges) {
+      std::vector<std::pair<size_t, size_t>> element_id_ranges) {
         if (element_id_ranges.size() != this->rank) {
             return std::nullopt;
         }
@@ -392,6 +397,7 @@ class ChunkedTensor : public Tensor<ValueType> {
 
         // Bounds check ranges
         for (size_t i = 0; i < this->rank; i++) {
+            element_id_ranges[i] = {std::get<0>(element_id_ranges[i]), std::get<1>(element_id_ranges[i]) - 1};
             if ((std::get<0>(element_id_ranges[i]) > std::get<1>(element_id_ranges[i])) ||
                 (std::get<0>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
                 (std::get<0>(element_id_ranges[i]) < 0) ||
@@ -471,7 +477,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     }
 
     ValueType *tryGetPtrToChunk(const std::vector<size_t> &chunk_indices) const {
-        if (chunk_indices != this->rank) {
+        if (chunk_indices.size() != this->rank) {
             return nullptr;
         }
 
@@ -495,7 +501,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     }
 
     std::optional<std::unique_ptr<ValueType[]>> tryGetChunk(const std::vector<size_t> &chunk_indices) const {
-        if (chunk_indices != this->rank) {
+        if (chunk_indices.size() != this->rank) {
             return std::nullopt;
         }
 
@@ -571,7 +577,7 @@ class ChunkedTensor : public Tensor<ValueType> {
             return false;
         }
         if (this->rank == 0) {
-            data.get()[0] = values;
+            data.get()[0] = values[0];
             return true;
         }
 
@@ -590,7 +596,7 @@ class ChunkedTensor : public Tensor<ValueType> {
 
     void setChunk(const std::vector<size_t> &chunk_indices, ValueType *values) {
         if (this->rank == 0) {
-            data.get()[0]                                                            = values;
+            data.get()[0]                                                            = values[0];
             chunk_materialization_flags[getLinearChunkIdFromChunkIds(chunk_indices)] = true;
             return;
         }
@@ -741,8 +747,8 @@ class ChunkedTensor : public Tensor<ValueType> {
         return true;
     }
 
-    // Ranges are inclusive on both boundaries
-    ChunkedTensor<ValueType> *tryDiceAtChunkLvl(const std::vector<std::pair<size_t, size_t>> &chunk_ranges) const {
+    // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
+    ChunkedTensor<ValueType> *tryDiceAtChunkLvl(std::vector<std::pair<size_t, size_t>> chunk_ranges) const {
         if (chunk_ranges.size() != this->rank) {
             return nullptr;
         }
@@ -755,6 +761,7 @@ class ChunkedTensor : public Tensor<ValueType> {
         }
 
         for (size_t i = 0; i < this->rank; i++) {
+            chunk_ranges[i] = {std::get<0>(chunk_ranges[i]), std::get<1>(chunk_ranges[i]) - 1};
             if (std::get<0>(chunk_ranges[i]) >= chunks_per_dim[i] ||
                 std::get<1>(chunk_ranges[i]) >= chunks_per_dim[i] ||
                 std::get<0>(chunk_ranges[i]) > std::get<1>(chunk_ranges[i])) {
@@ -808,8 +815,8 @@ class ChunkedTensor : public Tensor<ValueType> {
         return new_tensor;
     }
 
-    // Ranges are inclusive on both boundaries
-    ChunkedTensor<ValueType> *tryDice(const std::vector<std::pair<size_t, size_t>> &index_ranges,
+    // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
+    ChunkedTensor<ValueType> *tryDice(std::vector<std::pair<size_t, size_t>> index_ranges,
                                       const std::vector<size_t> &new_chunk_shape) const {
         if (index_ranges.size() != this->rank || new_chunk_shape.size() != this->rank) {
             return nullptr;
@@ -823,6 +830,7 @@ class ChunkedTensor : public Tensor<ValueType> {
         }
 
         for (size_t i = 0; i < this->rank; i++) {
+            index_ranges[i] = {std::get<0>(index_ranges[i]), std::get<1>(index_ranges[i]) - 1};
             if (std::get<0>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<1>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<0>(index_ranges[i]) > std::get<1>(index_ranges[i])) {
@@ -905,9 +913,9 @@ class ChunkedTensor : public Tensor<ValueType> {
         return new_tensor;
     }
 
-    // Ranges are inclusive on both boundaries
+    // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
     ContiguousTensor<ValueType> *tryDiceToContiguousTensor(
-      const std::vector<std::pair<size_t, size_t>> &index_ranges) const {
+      std::vector<std::pair<size_t, size_t>> index_ranges) const {
         if (index_ranges.size() != this->rank) {
             return nullptr;
         }
@@ -920,6 +928,7 @@ class ChunkedTensor : public Tensor<ValueType> {
         }
 
         for (size_t i = 0; i < this->rank; i++) {
+            index_ranges[i] = {std::get<0>(index_ranges[i]), std::get<1>(index_ranges[i]) - 1};
             if (std::get<0>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<1>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<0>(index_ranges[i]) > std::get<1>(index_ranges[i])) {
