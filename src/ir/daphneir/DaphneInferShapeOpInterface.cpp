@@ -346,12 +346,15 @@ std::vector<std::vector<ssize_t>> daphne::SliceRowOp::inferShape() {
         srcNumRows = srcFrmTy.getNumRows();
         srcNumCols = srcFrmTy.getNumCols();
     }
-    else
+    else if(auto srcTenTy = srcTy.dyn_cast<daphne::TensorType>()) {
+        srcNumRows = srcTenTy.getNumX();
+        srcNumCols = srcTenTy.getNumY();
+    }
+    else {
         // If this is the case, shape inference shouldn't have been called.
-        throw std::runtime_error(
-                "SliceRowOp shape inference does only support matrix and frame inputs"
-        );
-    
+        throw std::runtime_error("SliceRowOp shape inference does only support matrix, frame, and tensor inputs");
+    }
+
     auto loIn = CompilerUtils::isConstant<int64_t>(getLowerIncl());
     auto upEx = CompilerUtils::isConstant<int64_t>(getUpperExcl());
 
@@ -394,6 +397,10 @@ std::vector<std::vector<ssize_t>> daphne::SliceColOp::inferShape() {
         srcNumRows = srcFrmTy.getNumRows();
         srcNumCols = srcFrmTy.getNumCols();
     }
+    else if(auto srcTenTy = srcTy.dyn_cast<daphne::TensorType>()) {
+        srcNumRows = srcTenTy.getNumX();
+        srcNumCols = srcTenTy.getNumY();
+    }
     else
         // If this is the case, shape inference shouldn't have been called.
         throw std::runtime_error(
@@ -428,6 +435,9 @@ std::vector<std::vector<ssize_t>> daphne::SliceColOp::inferShape() {
     }
 
     return {{srcNumRows, resNumCols}};
+}
+
+std::vector<std::vector<ssize_t>> daphne::SliceTensorOp::inferShape() {
 }
 
 std::vector<std::vector<ssize_t>> daphne::EigenOp::inferShape() {

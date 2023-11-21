@@ -134,11 +134,11 @@ ZarrFileMetaData ZarrFileMetaDataParser::readMetaData(const std::string& filenam
     }
 
     if (data.contains("compressor")) {
-        std::cout << "Compression not yet supported!" << std::endl;
+        //std::cout << "Compression not yet supported!" << std::endl;
     }
 
     if (data.contains("filters")) {
-        std::cout << "Filters not yet supported!" << std::endl;
+        //std::cout << "Filters not yet supported!" << std::endl;
     }
 
     return zfmd;

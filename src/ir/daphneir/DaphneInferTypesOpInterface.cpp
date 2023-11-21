@@ -427,7 +427,12 @@ std::vector<Type> daphne::SliceColOp::inferTypes() {
             // in this case; actually, we should leave the column types blank, but this
             // cannot be represented at the moment.
             resTy = daphne::FrameType::get(getContext(), {u});
-    } else
+    }
+    else if (auto srcTensTy = srcTy.dyn_cast<daphne::TensorType>()) {
+        // Slicing columns from a tensor retains the value type.
+        resTy = srcTensTy.withSameElementType();
+    }
+    else
         resTy = u;
 
     return {resTy};
