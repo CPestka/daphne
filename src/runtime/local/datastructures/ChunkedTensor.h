@@ -63,6 +63,13 @@ class ChunkedTensor : public Tensor<ValueType> {
         if (this->rank > 0) {
             intra_chunk_strides[0] = 1;
         }
+
+        for(size_t i=0; i<this->rank; i++) {
+            if ((tensor_shape[i] == 0) || chunk_shape[i] == 0) {
+                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+            }
+        }
+
         for (size_t i = 1; i < this->rank; i++) {
             intra_chunk_strides[i] = intra_chunk_strides[i - 1] * chunk_shape[i - 1];
         }
@@ -180,6 +187,12 @@ class ChunkedTensor : public Tensor<ValueType> {
 
     ChunkedTensor(DenseMatrix<ValueType> *matrix, size_t chunk_size_x, size_t chunk_size_y)
         : Tensor<ValueType>::Tensor(matrix->getNumRows(), matrix->getNumCols()) {
+        for(size_t i=0; i<this->rank; i++) {
+            if ((this->tensor_shape[i] == 0) || chunk_shape[i] == 0)  {
+                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+            }
+        }
+
         chunk_shape         = {chunk_size_x, chunk_size_y};
         chunk_element_count = chunk_size_x * chunk_size_y;
         chunks_per_dim      = {this->tensor_shape[0] % chunk_size_x == 0 ? this->tensor_shape[0] / chunk_size_x
@@ -218,6 +231,12 @@ class ChunkedTensor : public Tensor<ValueType> {
 
         if (this->rank > 0) {
             intra_chunk_strides[0] = 1;
+        }
+
+        for(size_t i=0; i<this->rank; i++) {
+            if ((this->tensor_shape[i] == 0) || chunk_shape[i] == 0) {
+                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+            }
         }
 
         for (size_t i = 1; i < this->rank; i++) {

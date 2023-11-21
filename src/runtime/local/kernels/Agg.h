@@ -91,6 +91,10 @@ struct Agg<ContiguousTensor<VTRes>, ContiguousTensor<VTArg>> {
                                           const ContiguousTensor<VTArg>* arg,
                                           DCTX(ctx)) {
         size_t rank                             = arg->rank;
+        if (aggregate_dimension.size() != rank) {
+            throw std::runtime_error("Rank of tensor to reduce and size of aggregation map do not match!");
+        }
+
         std::vector<size_t> result_tensor_shape = arg->tensor_shape;
 
         for (size_t i = 0; i < rank; i++) {
@@ -122,6 +126,9 @@ struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
                                        const ChunkedTensor<VTArg>* arg,
                                        DCTX(ctx)) {
         size_t rank                             = arg->rank;
+        if (aggregate_dimension.size() != rank) {
+            throw std::runtime_error("Rank of tensor to reduce and size of aggregation map do not match!");
+        }
         std::vector<size_t> result_tensor_shape = arg->tensor_shape;
         std::vector<size_t> result_chunk_shape  = arg->chunk_shape;
 
@@ -198,6 +205,9 @@ struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
                                        const ChunkedTensor<VTArg>* arg,
                                        DCTX(ctx)) {
         size_t rank                             = arg->rank;
+        if (aggregate_dimension.size() != rank) {
+            throw std::runtime_error("Rank of tensor to reduce and size of aggregation map do not match!");
+        }
         std::vector<size_t> result_tensor_shape = arg->tensor_shape;
         std::vector<size_t> result_chunk_shape  = arg->chunk_shape;
 

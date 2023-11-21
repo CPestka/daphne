@@ -20,6 +20,7 @@
 #include <cstring>
 #include <ostream>
 #include <cstddef>
+#include <stdexcept>
 #include <tuple>
 #include <vector>
 #include <optional>
@@ -43,6 +44,12 @@ class ContiguousTensor : public Tensor<ValueType> {
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
+        }
+
+        for(size_t i=0; i<this->rank; i++) {
+            if (tensor_shape[i] == 0) {
+                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+            }
         }
 
         for (size_t i = 1; i < this->rank; i++) {
@@ -88,6 +95,11 @@ class ContiguousTensor : public Tensor<ValueType> {
     ContiguousTensor(DenseMatrix<ValueType> *other)
         : Tensor<ValueType>::Tensor(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
         strides = {1, other->getNumCols()};
+        for(size_t i=0; i<this->rank; i++) {
+            if (this->tensor_shape[i] == 0) {
+                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+            }
+        }
     }
 
     // Copies passed data
@@ -97,6 +109,12 @@ class ContiguousTensor : public Tensor<ValueType> {
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
+        }
+
+        for(size_t i=0; i<this->rank; i++) {
+            if (this->tensor_shape[i] == 0) {
+                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+            }
         }
 
         for (size_t i = 1; i < this->rank; i++) {
@@ -112,6 +130,12 @@ class ContiguousTensor : public Tensor<ValueType> {
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
+        }
+
+        for(size_t i=0; i<this->rank; i++) {
+            if (this->tensor_shape[i] == 0) {
+                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+            }
         }
 
         for (size_t i = 1; i < this->rank; i++) {
