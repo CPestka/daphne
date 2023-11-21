@@ -100,7 +100,7 @@ expr:
     ;
 
 indexing:
-    '[' (rows=range)? ',' (cols=range)? ']' ;
+    '[' (range)? ',' (range)? (',' range)? ']' ;
 
 range:
     pos=expr | ( (posLowerIncl=expr)? ':' (posUpperExcl=expr)? ) ;

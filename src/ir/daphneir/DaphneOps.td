@@ -606,12 +606,27 @@ def Daphne_SliceRowOp : Daphne_Op<"sliceRow", [
     let summary = "Copies the specified rows from the argument to the result.";
 
     let description = [{
-        Copies the rows of a data object `source` (matrix or frame) at the
+        Copies the rows of a data object `source` (matrix or frame, or tensor) at the
         positions in `[lowerIncl, upperExcl)` to the result.
     }];
 
-    let arguments = (ins MatrixOrFrame:$source, Size:$lowerIncl, Size:$upperExcl);
-    let results = (outs MatrixOrFrame:$res);
+    let arguments = (ins MatrixOrFrameOrTensor:$source, Size:$lowerIncl, Size:$upperExcl);
+    let results = (outs MatrixOrFrameOrTensor:$res);
+}
+
+def Daphne_SliceTensorOp : Daphne_Op<"sliceTensor", [
+    TypeFromFirstArg,
+    DeclareOpInterfaceMethods<InferShapeOpInterface>
+]> {
+    let summary = "Copies the specified rows from the argument to the result.";
+
+    let description = [{
+        Copies the rows of a data object `source` (matrix or frame, or tensor) at the
+        positions in `[lowerIncl, upperExcl)` to the result.
+    }];
+
+    let arguments = (ins MatrixOrFrameOrTensor:$source, Size:$lowerInclX, Size:$upperExclX, Size:$lowerInclY, Size:$upperExclY, Size:$lowerInclZ, Size:$upperExclZ);
+    let results = (outs MatrixOrFrameOrTensor:$res);
 }
 
 def Daphne_ExtractColOp : Daphne_Op<"extractCol", [
@@ -652,8 +667,8 @@ def Daphne_SliceColOp : Daphne_Op<"sliceCol", [
         positions in `[lowerIncl, upperExcl)` to the result.
     }];
 
-    let arguments = (ins MatrixOrFrame:$source, Size:$lowerIncl, Size:$upperExcl);
-    let results = (outs MatrixOrFrame:$res);
+    let arguments = (ins MatrixOrFrameOrTensor:$source, Size:$lowerIncl, Size:$upperExcl);
+    let results = (outs MatrixOrFrameOrTensor:$res);
 }
 
 // TODO Create combined InsertOp (see #238).

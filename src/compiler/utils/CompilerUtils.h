@@ -227,7 +227,7 @@ public:
     }
     
     [[maybe_unused]] static bool isObjType(mlir::Type t) {
-        return t.isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>();
+        return t.isa<mlir::daphne::MatrixType, mlir::daphne::FrameType, mlir::daphne::TensorType>();
     }
     
     [[maybe_unused]] static bool hasObjType(mlir::Value v) {

@@ -35,6 +35,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <iostream>
+#include <typeinfo>
 
 #include <cstdint>
 #include <cstdlib>
@@ -105,12 +107,15 @@ void DaphneDSLVisitor::handleAssignmentPart(
 
 template<class ExtractAxOp, class SliceAxOp, class NumAxOp>
 mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value arg, antlrcpp::Any ax, bool allowLabel) {
+    std::cout << "applyRightIndexing" << std::endl;
     if(ax.is<mlir::Value>()) { // indexing with a single SSA value (no ':')
+        std::cout << "indexing with a single SSA value (no ':')" << std::endl;
         mlir::Value axVal = ax.as<mlir::Value>();
-        if(CompilerUtils::hasObjType(axVal)) // data object
-            return utils.retValWithInferedType(
-                    builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal)
-            );
+        // data object
+        if(CompilerUtils::hasObjType(axVal)) {
+            std::cout << "CompilerUtils::hasObjType(axVal)" << std::endl;
+            return utils.retValWithInferedType(builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal));
+        }
         else if(axVal.getType().isa<mlir::daphne::StringType>()) { // string
             if(allowLabel)
                 return utils.retValWithInferedType(
@@ -122,6 +127,8 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
                 );
         }
         else // scalar
+        {
+            std::cout << "axVal.getType() scalar" << std::endl;
             return utils.retValWithInferedType(
                     builder.create<SliceAxOp>(
                             loc, utils.unknownType, arg,
@@ -137,8 +144,10 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
                             )
                     )
             );
+        }
     }
     else if(ax.is<std::pair<mlir::Value, mlir::Value>>()) { // indexing with a range (':')
+        std::cout << "indexing with a range (':')" << std::endl;
         auto axPair = ax.as<std::pair<mlir::Value, mlir::Value>>();
         auto axLowerIncl = axPair.first;
         auto axUpperExcl = axPair.second;
@@ -1076,13 +1085,42 @@ antlrcpp::Any DaphneDSLVisitor::visitRightIdxFilterExpr(DaphneDSLGrammarParser::
 
 antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser::RightIdxExtractExprContext * ctx) {
     mlir::Value obj = utils.valueOrError(visit(ctx->obj));
+    std::cout << "antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser::RightIdxExtractExprContext * ctx) {" << std::endl;
+    auto indexing = visit(ctx->idx).as<std::vector<std::pair<bool, antlrcpp::Any>>>();
 
-    auto indexing = visit(ctx->idx).as<std::pair<
-            std::pair<bool, antlrcpp::Any>,
-            std::pair<bool, antlrcpp::Any>
-    >>();
-    auto rows = indexing.first;
-    auto cols = indexing.second;
+    if (obj.getType().isa<mlir::daphne::TensorType>()) {
+        std::cout << "tensor type!" << std::endl;
+        for (size_t i = 0; i < indexing.size(); ++i) {
+            if (indexing[i].second.is<mlir::Value>()) {
+                std::cout << "single value" << std::endl;
+                mlir::Value numLower = utils.castSizeIf(indexing[i].second.as<mlir::Value>());
+            } else if (indexing[i].second.is<std::pair<mlir::Value,mlir::Value>>()) {
+                std::cout << "pair value" << std::endl;
+                mlir::Value numLower = utils.castSizeIf(indexing[i].second.as<std::pair<mlir::Value,mlir::Value>>().first);
+                mlir::Value numUpper = utils.castSizeIf(indexing[i].second.as<std::pair<mlir::Value,mlir::Value>>().second);
+            }
+        }
+        if (indexing[0].second.is<mlir::Value>()) {
+            mlir::Value numXLower = utils.castSizeIf(indexing[0].second.as<mlir::Value>());
+            mlir::Value numXUpper = utils.castSizeIf(indexing[0].second.as<mlir::Value>());
+            mlir::Value numYLower = utils.castSizeIf(indexing[1].second.as<mlir::Value>());
+            mlir::Value numYUpper = utils.castSizeIf(indexing[1].second.as<mlir::Value>());
+            mlir::Value numZLower = utils.castSizeIf(indexing[2].second.as<mlir::Value>());
+            mlir::Value numZUpper = utils.castSizeIf(indexing[2].second.as<mlir::Value>());
+            return utils.retValWithInferedType(builder.create<mlir::daphne::SliceTensorOp>(utils.getLoc(ctx->idx->start), utils.unknownType, obj, numXLower, numXUpper, numYLower, numYUpper, numZLower, numZUpper));
+        } else if (indexing[0].second.is<std::pair<mlir::Value,mlir::Value>>()) {
+            mlir::Value numXLower = utils.castSizeIf(indexing[0].second.as<std::pair<mlir::Value,mlir::Value>>().first);
+            mlir::Value numXUpper = utils.castSizeIf(indexing[0].second.as<std::pair<mlir::Value,mlir::Value>>().second);
+            mlir::Value numYLower = utils.castSizeIf(indexing[1].second.as<std::pair<mlir::Value,mlir::Value>>().first);
+            mlir::Value numYUpper = utils.castSizeIf(indexing[1].second.as<std::pair<mlir::Value,mlir::Value>>().second);
+            mlir::Value numZLower = utils.castSizeIf(indexing[2].second.as<std::pair<mlir::Value,mlir::Value>>().first);
+            mlir::Value numZUpper = utils.castSizeIf(indexing[2].second.as<std::pair<mlir::Value,mlir::Value>>().second);
+            return utils.retValWithInferedType(builder.create<mlir::daphne::SliceTensorOp>(utils.getLoc(ctx->idx->start), utils.unknownType, obj, numXLower, numXUpper, numYLower, numYUpper, numZLower, numZUpper));
+        }
+    }
+
+    auto rows = indexing[0];
+    auto cols = indexing[1];
 
     // TODO Use location of rows/cols in utils.getLoc(...) for better
     // error messages.
@@ -1093,10 +1131,7 @@ antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser:
                 mlir::daphne::NumRowsOp
         >(utils.getLoc(ctx->idx->start), obj, rows.second, false);
     if(cols.first) // cols specified
-        obj = applyRightIndexing<
-                mlir::daphne::ExtractColOp,
-                mlir::daphne::SliceColOp,
-                mlir::daphne::NumColsOp
+        obj = applyRightIndexing<mlir::daphne::ExtractColOp, mlir::daphne::SliceColOp, mlir::daphne::NumColsOp
         >(utils.getLoc(ctx->idx->start), obj, cols.second, obj.getType().isa<mlir::daphne::FrameType>());
 
     // Note: If rows and cols are specified, we create two extraction steps.
@@ -1310,19 +1345,23 @@ antlrcpp::Any DaphneDSLVisitor::visitMatrixLiteralExpr(DaphneDSLGrammarParser::M
 }
 
 antlrcpp::Any DaphneDSLVisitor::visitIndexing(DaphneDSLGrammarParser::IndexingContext * ctx) {
-    auto rows = ctx->rows
-            ? visit(ctx->rows).as<std::pair<bool, antlrcpp::Any>>()
-            : std::make_pair(false, antlrcpp::Any(nullptr));
-    auto cols = ctx->cols
-            ? visit(ctx->cols).as<std::pair<bool, antlrcpp::Any>>()
-            : std::make_pair(false, antlrcpp::Any(nullptr));
-    return std::make_pair(rows, cols);
+    std::cout << "visitIndexing (" << ctx->range().size() << ")" << std::endl;
+    std::vector<std::pair<bool, antlrcpp::Any>> ranges;
+    for (size_t i = 0; i < ctx->range().size(); ++i) {
+        auto range = visit(ctx->range(i)).as<std::pair<bool, antlrcpp::Any>>();
+        ranges.push_back(range);
+    }
+    return ranges;
 }
 
 antlrcpp::Any DaphneDSLVisitor::visitRange(DaphneDSLGrammarParser::RangeContext * ctx) {
-    if(ctx->pos)
+    std::cout << "visitRange" << std::endl;
+    if(ctx->pos) {
+        std::cout << "return single value!" << std::endl;
         return std::make_pair(true, antlrcpp::Any(utils.valueOrError(visit(ctx->pos))));
+    }
     else {
+        std::cout << "return multiple values!" << std::endl;
         mlir::Value posLowerIncl = ctx->posLowerIncl ? utils.valueOrError(visit(ctx->posLowerIncl)) : nullptr;
         mlir::Value posUpperExcl = ctx->posUpperExcl ? utils.valueOrError(visit(ctx->posUpperExcl)) : nullptr;
         return std::make_pair(
