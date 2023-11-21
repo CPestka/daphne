@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <endian.h>
 #include <parser/metadata/ZarrFileMetaDataParser.h>
 
 #include <fstream>
@@ -34,7 +35,12 @@ ZarrFileMetaData ZarrFileMetaDataParser::readMetaData(const std::string& filenam
                             /*.zarr_format=*/ data["zarr_format"].get<decltype(zfmd.zarr_format)>(),
                             /*.order=*/ data["order"].get<decltype(zfmd.order)>(),
                             /*.fill_value=*/ data["fill_value"].get<decltype(zfmd.fill_value)>(),
-                            /*.dtype=*/ data["dtype"].get<decltype(zfmd.dtype)>(),};
+                            /*.dtype=*/ data["dtype"].get<decltype(zfmd.dtype)>(),
+                            // Values will be overwriten later. Init to apease compiler
+                            /*.dimension_seperator*/ ".",
+                            /*.byte_order*/ ByteOrder::LITTLEENDIAN,
+                            /*.data_type*/ ZarrDatatype::INT64,
+                            /*.nBytes*/ 8};
 
     // extract byte order
     switch (zfmd.dtype.at(0)) {

@@ -38,7 +38,7 @@ TEMPLATE_TEST_CASE("castObjSca, matrix to scalar", TAG_KERNELS, double, float, i
     }
 
     SECTION("DenseMatrix<double> to VTRes") {
-        VTRes exp = 2.2;
+        VTRes exp = static_cast<VTRes>(2.2);
         auto m0 = genGivenVals<DenseMatrix<double>>(1, {static_cast<double>(exp)});
         res = castObjSca<VTRes, DenseMatrix<double>>(m0, nullptr);
         CHECK(res == exp); 
@@ -51,7 +51,7 @@ TEMPLATE_TEST_CASE("castObjSca, frame to scalar", TAG_KERNELS, double, float, in
 
     Frame* arg = nullptr;
     SECTION("Frame[double] to VTRes") {
-        VTRes exp = 2.2;
+        VTRes exp = static_cast<VTRes>(2.2);
 
         auto m0 = genGivenVals<DenseMatrix<double>>(1, {static_cast<double>(exp)});
         std::vector<Structure *> cols = {m0};

@@ -161,7 +161,7 @@ ssize_t daphne::SeqOp::inferNumRows() {
             int64_t vFrom = CompilerUtils::constantOrThrow<int64_t>(getFrom());
             int64_t vTo = CompilerUtils::constantOrThrow<int64_t>(getTo());
             int64_t vInc = CompilerUtils::constantOrThrow<int64_t>(getInc());
-            return abs(vTo - vFrom) / abs(vInc) + 1;
+            return std::abs(vTo - vFrom) / std::abs(vInc) + 1;
         }
         catch(const std::runtime_error & e) {
             return -1;

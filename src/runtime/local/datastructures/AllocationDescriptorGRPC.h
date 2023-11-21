@@ -23,7 +23,7 @@
 
 class AllocationDescriptorGRPC : public IAllocationDescriptor {
 private:
-    DaphneContext *ctx;
+    [[maybe_unused]] DaphneContext *ctx;
     ALLOCATION_TYPE type = ALLOCATION_TYPE::DIST_GRPC;
     const std::string workerAddress;
     DistributedData distributedData;

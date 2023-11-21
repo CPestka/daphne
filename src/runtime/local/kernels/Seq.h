@@ -80,7 +80,7 @@ struct Seq<DenseMatrix<VT>> {
 
             VT lastValue=allValues[expectedNumRows-1];
 
-            VT eps = 1.0e-13;
+            VT eps = static_cast<VT>(1.0e-13);
 
             // on my machine the difference is (1.7e-15) greater  than epsilon std::numeric_limits<VT>::epsilon() 
             if ( (end < start) && end-lastValue>eps ) { // reversed sequence

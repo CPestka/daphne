@@ -75,6 +75,8 @@ struct Parser {
         // Parse the string contents.
         parseStream(builder, s, sourceName);
     }
+
+    virtual ~Parser() = default;
 };
 
 #endif //SRC_PARSER_PARSER_H

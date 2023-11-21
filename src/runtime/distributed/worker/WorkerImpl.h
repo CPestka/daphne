@@ -42,7 +42,7 @@ public:
     DaphneUserConfig& cfg;
 
     WorkerImpl(DaphneUserConfig& _cfg);
-    ~WorkerImpl() = default;
+    virtual ~WorkerImpl() = default;
     
     virtual void Wait() { };
    

@@ -26,7 +26,7 @@
 class AllocationDescriptorMPI : public IAllocationDescriptor {
     ALLOCATION_TYPE type = ALLOCATION_TYPE::DIST_MPI;
     int processRankID;
-    DaphneContext* ctx;
+    [[maybe_unused]] DaphneContext* ctx;
     DistributedData distributedData;
     std::shared_ptr<std::byte> data;
 
