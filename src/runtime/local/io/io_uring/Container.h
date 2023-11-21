@@ -53,6 +53,7 @@ struct ThreadSafeStack {
 
         lck.unlock();
     }
+
     void Push(const std::vector<T> &tasks) {
         lck.lock();
         uint64_t current_size = size.load();
@@ -66,6 +67,7 @@ struct ThreadSafeStack {
 
         lck.unlock();
     }
+
     std::optional<T> TryPop() {
         lck.lock();
         if (size == 0) {
@@ -78,6 +80,7 @@ struct ThreadSafeStack {
         lck.unlock();
         return result;
     }
+
     std::vector<T> TryPop(uint64_t max_elements_poped) {
         lck.lock();
         if (size == 0) {
@@ -98,6 +101,7 @@ struct ThreadSafeStack {
 
         return results;
     }
+
     std::optional<T> PollThenTryPop() {
         if (size == 0) {
             return std::nullopt;
@@ -111,39 +115,6 @@ struct ThreadSafeStack {
         }
 
         T result = data[--size];
-
-        lck.unlock();
-        return result;
-    }
-
-    std::optional<T> FindFirstBasedOnUUIDAndExtract(uint64_t uuid) {
-        lck.lock();
-
-        for (uint64_t i = 0; i < size; i++) {
-            if (data[i]->GetUUID() == uuid) {
-                T result = data[i];
-                Erase<true>(i);
-                lck.unlock();
-                return result;
-            }
-        }
-
-        lck.unlock();
-
-        return std::nullopt;
-    }
-
-    std::vector<T> FindAllBasedOnUUIDAndExtract(uint64_t uuid) {
-        std::vector<T> result;
-
-        lck.lock();
-
-        for (uint64_t i = 0; i < size; i++) {
-            if (data[i]->GetUUID() == uuid) {
-                result.push_back(data[i]);
-                Erase<true>(i);
-            }
-        }
 
         lck.unlock();
         return result;
@@ -173,6 +144,7 @@ struct ThreadSafeStack {
     ThreadSafeStack() {
         data = static_cast<T *>(std::malloc(sizeof(T) * 16));
     }
+
     ~ThreadSafeStack() {
         free(data);
     }
@@ -196,6 +168,29 @@ struct Pool {
             is_in_use[i] = false;
         }
     };
+
+    std::optional<uint64_t> Alloc() {
+        for (uint64_t i = 0; i < max_size; i++) {
+            entry_lcks[i].lock();
+            if (!is_in_use[i]) {
+                is_in_use[i] = true;
+                entry_lcks[i].unlock();
+                return i;
+            }
+            entry_lcks[i].unlock();
+        }
+
+        return std::nullopt;
+    }
+
+    void Free(uint64_t id) {
+        entry_lcks[id].lock();
+        if (is_in_use[id]) {
+            currently_occupied_slots--;
+            is_in_use[id] = false;
+        }
+        entry_lcks[id].unlock();
+    }
 
     // Attempts to insert item into pool and returns the according index.
     // Fails if full, but also may spuriously fail if polling flag is set
@@ -261,15 +256,6 @@ struct Pool {
         return std::nullopt;
     }
 
-    void Free(uint64_t id) {
-        entry_lcks[id].lock();
-        if (is_in_use[id]) {
-            currently_occupied_slots--;
-            is_in_use[id] = false;
-        }
-        entry_lcks[id].unlock();
-    }
-
     std::optional<uint64_t> Find(DataType to_find) {
         for (uint64_t i = 0; i < max_size; i++) {
             if (is_in_use[i]) {
@@ -331,27 +317,6 @@ struct Pool {
         return std::nullopt;
     }
 
-    // Requires a getUUID(void) -> uint64_t memberfunction in DataType
-    std::optional<DataType> FindAndExtractUUID(uint64_t uuid) {
-        for (uint64_t i = 0; i < max_size; i++) {
-            entry_lcks[i].lock();
-
-            if (is_in_use[i]) {
-                if (data[i].GetUUID() == uuid) {
-                    // Found a match
-                    is_in_use[i] = false;
-                    currently_occupied_slots--;
-                    DataType result = data[i];
-                    entry_lcks[i].unlock();
-                    return result;
-                }
-            }
-            entry_lcks[i].unlock();
-        }
-        // No match
-        return std::nullopt;
-    }
-
     void LockAllSlots() {
         for (uint64_t i = 0; i < max_size; i++) {
             entry_lcks[i].lock();
@@ -362,20 +327,6 @@ struct Pool {
         for (uint64_t i = 0; i < max_size; i++) {
             entry_lcks[i].unlock();
         }
-    }
-
-    std::optional<uint64_t> Alloc() {
-        for (uint64_t i = 0; i < max_size; i++) {
-            entry_lcks[i].lock();
-            if (!is_in_use[i]) {
-                is_in_use[i] = true;
-                entry_lcks[i].unlock();
-                return i;
-            }
-            entry_lcks[i].unlock();
-        }
-
-        return std::nullopt;
     }
 
     DataType Extract(uint64_t id) {

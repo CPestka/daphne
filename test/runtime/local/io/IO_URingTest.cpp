@@ -23,10 +23,10 @@
 #include <tags.h>
 
 #include <catch.hpp>
-#include "AsyncUtil.h"
 
-#include <IO_Threadpool.h>
-#include <IO_URing.h>
+#include "runtime/local/io/io_uring/AsyncUtil.h"
+#include "runtime/local/io/io_uring/IO_Threadpool.h"
+#include "runtime/local/io/io_uring/IO_URing.h"
 
 TEST_CASE("io_uring / io threadpool setup Tests", TAG_IO) {
     URing(64, false, false, 1000);
