@@ -108,6 +108,8 @@ public:
         return numCols;
     }
 
+    [[nodiscard]] virtual size_t getNumDims() const = 0;
+
     virtual size_t getNumItems() const = 0;
 
     /**

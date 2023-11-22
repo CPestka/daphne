@@ -52,6 +52,10 @@ class Tensor : public Structure {
     virtual ~Tensor() {};
 
     public:
+
+    virtual size_t getNumDims() const override {
+        return rank;
+    }
     
     // These pure virtual functions are only well defined for a ND-tensor in the
     // case of N=2

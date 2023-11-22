@@ -25,7 +25,7 @@
 // ****************************************************************************
 
 size_t numCells(const Structure * arg, DCTX(ctx)) {
-    return arg->getNumCols() * arg->getNumRows();
+    return arg->getNumItems();
 }
 
 #endif //SRC_RUNTIME_LOCAL_KERNELS_NUMCELLS_H

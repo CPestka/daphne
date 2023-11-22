@@ -25,7 +25,7 @@
 // ****************************************************************************
 
 size_t numDims(const Structure * arg, DCTX(ctx)) {
-    return arg->getNumCols() * arg->getNumRows();
+    return arg->getNumDims();
 }
 
 #endif //SRC_RUNTIME_LOCAL_KERNELS_NUMDIMS_H

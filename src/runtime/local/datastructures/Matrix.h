@@ -50,6 +50,10 @@ public:
      * @brief The common type of all values in this matrix.
      */
     using VT = ValueType;
+
+    virtual size_t getNumDims() const override {
+        return 2;
+    }
     
     /**
      * @brief Returns the value at the given coordinates in this matrix.

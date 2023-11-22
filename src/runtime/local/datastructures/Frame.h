@@ -485,6 +485,10 @@ public:
         return this->getNumRows() * this->getNumCols();
     }
 
+    virtual size_t getNumDims() const override {
+        return 2;
+    }
+
     size_t serialize(std::vector<char> &buf) const override;
 };
 
