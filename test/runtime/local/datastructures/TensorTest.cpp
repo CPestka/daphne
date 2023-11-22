@@ -196,7 +196,7 @@ TEMPLATE_TEST_CASE("Tensor dicing, rechunking and conversions",
       DataObjectFactory::create<ChunkedTensor<TestType>>(tensor_shape, chunk_shape, InitCode::IOTA);
 
     SECTION(".dice() and variants") {
-        std::vector<std::pair<size_t, size_t>> dice_range = {{1, 2}, {3, 3}, {0, 1}};
+        std::vector<std::pair<size_t, size_t>> dice_range = {{1, 3}, {3, 4}, {0, 2}};
         ContiguousTensor<TestType> *dice0                 = ct->tryDice(dice_range);
 
         REQUIRE(dice0 != nullptr);
@@ -221,7 +221,7 @@ TEMPLATE_TEST_CASE("Tensor dicing, rechunking and conversions",
         REQUIRE(dice3->data[2] == 22);
         REQUIRE(dice3->data[3] == 23);
 
-        std::vector<std::pair<size_t, size_t>> dice_chunk_range = {{0, 0}, {1, 1}, {0, 0}};
+        std::vector<std::pair<size_t, size_t>> dice_chunk_range = {{0, 1}, {1, 2}, {0, 1}};
         ChunkedTensor<TestType> *dice4                          = cht->tryDiceAtChunkLvl(dice_chunk_range);
 
         REQUIRE(dice4 != nullptr);
