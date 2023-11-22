@@ -42,12 +42,12 @@ struct AggOpCodeUtils {
             case AggOpCode::PROD:
             case AggOpCode::MIN:
             case AggOpCode::MAX:
+            case AggOpCode::IDXMAX:
+            case AggOpCode::IDXMIN:
                 return true;
             case AggOpCode::MEAN:
             case AggOpCode::STDDEV:
                 return false;
-            default:
-                throw std::runtime_error("unsupported AggOpCode");
         }
     }
     
