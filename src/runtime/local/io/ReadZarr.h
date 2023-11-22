@@ -75,16 +75,6 @@ void readZarr(DTRes *&res,
 }
 
 template<typename VT>
-void ReverseArray(VT *data, uint64_t element_count) {
-    for (uint64_t i = 0; i < element_count; i++) {
-        VT tmp = data[i];
-        for (uint32_t j = 0; j < sizeof(VT); j++) {
-            *(reinterpret_cast<uint8_t *>(&(data[i])) + sizeof(VT) - j) = *(reinterpret_cast<uint8_t *>(&tmp) + j);
-        }
-    }
-}
-
-template<typename VT>
 void CheckZarrMetaDataVT(ZarrDatatype read_type) {
     switch (read_type) {
         // using enum ZarrDatatype;
@@ -563,9 +553,12 @@ struct PartialReadZarr<ChunkedTensor<VT>> {
                                          std::string(strerror(err)));
             }
 
-            read_requests[i] = {
-              res->getLinearChunkIdFromChunkIds(requested_chunk_ids.value()[i]), amount_of_bytes_to_read, 0, status};
-            AsyncIOInfo *chunk_async_io_info         = res->GetAsyncIOInfo(requested_chunk_ids);
+            read_requests[i].dest   = res->getPtrToChunk(requested_chunk_ids.value()[i]);
+            read_requests[i].size   = amount_of_bytes_to_read;
+            read_requests[i].offset = 0;
+            read_requests[i].fd     = status;
+
+            AsyncIOInfo *chunk_async_io_info         = res->GetAsyncIOInfo(requested_chunk_ids.value()[i]);
             chunk_async_io_info->needs_byte_reversal = !endianness_match;
             io_futures[i]                            = &(chunk_async_io_info->status);
         }

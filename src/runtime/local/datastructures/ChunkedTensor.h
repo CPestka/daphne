@@ -36,6 +36,16 @@ struct AsyncIOInfo {
     bool needs_byte_reversal      = false;
 };
 
+template<typename VT>
+void ReverseArray(VT *data, uint64_t element_count) {
+    for (uint64_t i = 0; i < element_count; i++) {
+        VT tmp = data[i];
+        for (uint32_t j = 0; j < sizeof(VT); j++) {
+            *(reinterpret_cast<uint8_t *>(&(data[i])) + sizeof(VT) - j) = *(reinterpret_cast<uint8_t *>(&tmp) + j);
+        }
+    }
+}
+
 template<typename ValueType>
 class ChunkedTensor : public Tensor<ValueType> {
     public:
@@ -386,9 +396,7 @@ class ChunkedTensor : public Tensor<ValueType> {
             element_id_ranges[i] = {std::get<0>(element_id_ranges[i]), std::get<1>(element_id_ranges[i]) - 1};
             if ((std::get<0>(element_id_ranges[i]) > std::get<1>(element_id_ranges[i])) ||
                 (std::get<0>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
-                (std::get<0>(element_id_ranges[i]) < 0) ||
-                (std::get<1>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
-                (std::get<1>(element_id_ranges[i]) < 0)) {
+                (std::get<1>(element_id_ranges[i]) >= this->tensor_shape[i])) {
                 return std::nullopt;
             }
         }
@@ -417,9 +425,7 @@ class ChunkedTensor : public Tensor<ValueType> {
             element_id_ranges[i] = {std::get<0>(element_id_ranges[i]), std::get<1>(element_id_ranges[i]) - 1};
             if ((std::get<0>(element_id_ranges[i]) > std::get<1>(element_id_ranges[i])) ||
                 (std::get<0>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
-                (std::get<0>(element_id_ranges[i]) < 0) ||
-                (std::get<1>(element_id_ranges[i]) >= this->tensor_shape[i]) ||
-                (std::get<1>(element_id_ranges[i]) < 0)) {
+                (std::get<1>(element_id_ranges[i]) >= this->tensor_shape[i])) {
                 return std::nullopt;
             }
         }
@@ -463,6 +469,27 @@ class ChunkedTensor : public Tensor<ValueType> {
 
     bool IsChunkMaterialized(const std::vector<size_t> &chunk_indices) const {
         return chunk_materialization_flags[getLinearChunkIdFromChunkIds(chunk_indices)];
+    }
+
+    bool PollChunkMaterializationAndIOStatus(size_t linear_chunk_id) {
+        if (chunk_materialization_flags[linear_chunk_id]) {
+            return true;
+        }
+
+        if (chunk_io_futures[linear_chunk_id].status == IO_STATUS::SUCCESS) {
+            if (chunk_io_futures[linear_chunk_id].needs_byte_reversal) {
+                ReverseArray(getPtrToChunk(linear_chunk_id), chunk_element_count);
+                chunk_io_futures[linear_chunk_id].needs_byte_reversal = false;
+            }
+            
+            chunk_materialization_flags[linear_chunk_id] = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool PollChunkMaterializationAndIOStatus(const std::vector<size_t> &chunk_indices) {
+        return PollChunkMaterializationAndIOStatus(getLinearChunkIdFromChunkIds(chunk_indices));
     }
 
     std::optional<ValueType> tryGet(const std::vector<size_t> &indices) const {
@@ -516,6 +543,13 @@ class ChunkedTensor : public Tensor<ValueType> {
             return data.get();
         }
         return &(data.get()[getLinearIdFromChunkIds(chunk_indices)]);
+    }
+
+    ValueType *getPtrToChunk(size_t linear_chunk_id) const {
+        if (this->rank == 0) {
+            return data.get();
+        }
+        return &(data.get()[linear_chunk_id]);
     }
 
     std::optional<std::unique_ptr<ValueType[]>> tryGetChunk(const std::vector<size_t> &chunk_indices) const {

@@ -169,12 +169,16 @@ struct Pool {
         }
     };
 
+    template<bool keep_holding_lock_after_success>
     std::optional<uint64_t> Alloc() {
         for (uint64_t i = 0; i < max_size; i++) {
             entry_lcks[i].lock();
             if (!is_in_use[i]) {
                 is_in_use[i] = true;
-                entry_lcks[i].unlock();
+                currently_occupied_slots++;
+                if constexpr (!keep_holding_lock_after_success) {
+                    entry_lcks[i].unlock();
+                }
                 return i;
             }
             entry_lcks[i].unlock();
@@ -183,8 +187,11 @@ struct Pool {
         return std::nullopt;
     }
 
+    template<bool already_holding_lock>
     void Free(uint64_t id) {
-        entry_lcks[id].lock();
+        if constexpr (!already_holding_lock) {
+            entry_lcks[id].lock();
+        }
         if (is_in_use[id]) {
             currently_occupied_slots--;
             is_in_use[id] = false;
@@ -256,6 +263,7 @@ struct Pool {
         return std::nullopt;
     }
 
+    template<bool keep_holding_lock_after_success>
     std::optional<uint64_t> Find(DataType to_find) {
         for (uint64_t i = 0; i < max_size; i++) {
             if (is_in_use[i]) {
@@ -263,7 +271,9 @@ struct Pool {
 
                 if (is_in_use[i]) {
                     if (data[i] == to_find) {
-                        entry_lcks[i].unlock();
+                        if constexpr (!keep_holding_lock_after_success) {
+                            entry_lcks[i].unlock();
+                        }
                         return i;
                     }
                 }

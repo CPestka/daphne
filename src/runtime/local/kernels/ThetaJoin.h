@@ -170,7 +170,7 @@ class ThetaJoin<Frame, Frame, Frame> {
         uint64_t readOffset = 0;
         uint64_t writeOffset = 0;
         uint64_t size_ = 0;
-        uint64_t maxSize = 0;
+        [[maybe_unused]] uint64_t maxSize = 0;
         
       public:
         explicit ResultContainer(uint64_t maxNumRows)

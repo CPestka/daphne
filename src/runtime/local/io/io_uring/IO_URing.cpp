@@ -104,10 +104,16 @@ void URing::SubmitRead() {
         if (sqe == nullptr) {    // no sqe available
             break;
         }
-        alloced_slots_for_sqe_meta_data.push_back(in_flight_SQEs.Alloc().value());
+
+        alloced_slots_for_sqe_meta_data.push_back(in_flight_SQEs.Insert({reads[i].initial_dest,
+                                                                         reads[i].current_dest,
+                                                                         reads[i].remaining_size,
+                                                                         reads[i].status,
+                                                                         reads[i].offset,
+                                                                         reads[i].fd,
+                                                                         IO_OP_CODE::READ}));
 
         io_uring_prep_read(sqe, reads[i].fd, reads[i].current_dest, reads[i].remaining_size, reads[i].offset);
-
         io_uring_sqe_set_data64(sqe, static_cast<__u64>(GetUUID(IO_OP_CODE::READ, alloced_slots_for_sqe_meta_data[i])));
 
         // Workaround for https://github.com/axboe/liburing/issues/88
@@ -118,7 +124,7 @@ void URing::SubmitRead() {
         if (use_sq_polling) {
             int amount_sqe_submitted = io_uring_submit(&ring);
             if (amount_sqe_submitted < 0) {
-                in_flight_SQEs.Free(alloced_slots_for_sqe_meta_data[i]);
+                in_flight_SQEs.template Free<false>(alloced_slots_for_sqe_meta_data[i]);
                 break;
             }
             requests_submitted++;
@@ -157,21 +163,8 @@ void URing::SubmitRead() {
 
     if (requests_submitted < amount_of_requests_to_submit) {
         for (size_t i = requests_submitted; i < amount_of_requests_to_submit; i++) {
-            in_flight_SQEs.Free(alloced_slots_for_sqe_meta_data[i]);
+            in_flight_SQEs.template Free<false>(alloced_slots_for_sqe_meta_data[i]);
         }
-    }
-
-    for (size_t i = 0; i < requests_submitted; i++) {
-        uint64_t current_slot_id = alloced_slots_for_sqe_meta_data[i];
-        in_flight_SQEs.entry_lcks[current_slot_id].lock();
-        in_flight_SQEs.data[current_slot_id] = {reads[i].initial_dest,
-                                                reads[i].current_dest,
-                                                reads[i].remaining_size,
-                                                reads[i].status,
-                                                reads[i].offset,
-                                                reads[i].fd,
-                                                IO_OP_CODE::READ};
-        in_flight_SQEs.entry_lcks[current_slot_id].unlock();
     }
 }
 
@@ -203,10 +196,15 @@ void URing::SubmitWrite() {
         if (sqe == nullptr) {    // no sqe available
             break;
         }
-        alloced_slots_for_sqe_meta_data.push_back(in_flight_SQEs.Alloc().value());
+        alloced_slots_for_sqe_meta_data.push_back(in_flight_SQEs.Insert({writes[i].initial_dest,
+                                                                         writes[i].current_dest,
+                                                                         writes[i].remaining_size,
+                                                                         writes[i].status,
+                                                                         writes[i].offset,
+                                                                         writes[i].fd,
+                                                                         IO_OP_CODE::WRITE}));
 
         io_uring_prep_write(sqe, writes[i].fd, writes[i].initial_dest, writes[i].remaining_size, writes[i].offset);
-
         io_uring_sqe_set_data64(sqe,
                                 static_cast<__u64>(GetUUID(IO_OP_CODE::WRITE, alloced_slots_for_sqe_meta_data[i])));
 
@@ -218,7 +216,7 @@ void URing::SubmitWrite() {
         if (use_sq_polling) {
             int amount_sqe_submitted = io_uring_submit(&ring);
             if (amount_sqe_submitted < 0) {
-                in_flight_SQEs.Free(alloced_slots_for_sqe_meta_data[i]);
+                in_flight_SQEs.template Free<false>(alloced_slots_for_sqe_meta_data[i]);
                 break;
             }
             requests_submitted++;
@@ -257,21 +255,8 @@ void URing::SubmitWrite() {
 
     if (requests_submitted < amount_of_requests_to_submit) {
         for (size_t i = requests_submitted; i < amount_of_requests_to_submit; i++) {
-            in_flight_SQEs.Free(alloced_slots_for_sqe_meta_data[i]);
+            in_flight_SQEs.template Free<false>(alloced_slots_for_sqe_meta_data[i]);
         }
-    }
-
-    for (size_t i = 0; i < requests_submitted; i++) {
-        uint64_t current_slot_id = alloced_slots_for_sqe_meta_data[i];
-        in_flight_SQEs.entry_lcks[current_slot_id].lock();
-        in_flight_SQEs.data[current_slot_id] = {writes[i].initial_dest,
-                                                writes[i].current_dest,
-                                                writes[i].remaining_size,
-                                                writes[i].status,
-                                                writes[i].offset,
-                                                writes[i].fd,
-                                                IO_OP_CODE::WRITE};
-        in_flight_SQEs.entry_lcks[current_slot_id].unlock();
     }
 }
 
@@ -285,11 +270,11 @@ void URing::HandleRead(uint64_t slot_id, int32_t cqe_res) {
         // partial read -> not a failure -> resubmit modified request
         if (static_cast<uint32_t>(cqe_res) < in_flight_request.remaining_size) {
             this->read_submission_q.Push({in_flight_request.initial,
-                                    (static_cast<uint8_t *>(in_flight_request.current) + cqe_res),
-                                    in_flight_request.remaining_size - cqe_res,
-                                    in_flight_request.offset,
-                                    in_flight_request.fd,
-                                    reinterpret_cast<std::atomic<IO_STATUS> *>(in_flight_request.result)});
+                                          (static_cast<uint8_t *>(in_flight_request.current) + cqe_res),
+                                          in_flight_request.remaining_size - cqe_res,
+                                          in_flight_request.offset,
+                                          in_flight_request.fd,
+                                          reinterpret_cast<std::atomic<IO_STATUS> *>(in_flight_request.result)});
             return;
         }
 
@@ -323,11 +308,11 @@ void URing::HandleWrite(uint64_t slot_id, int32_t cqe_res) {
         // partial write -> not a failure -> resubmit modified request
         if (static_cast<uint32_t>(cqe_res) < in_flight_request.remaining_size) {
             this->write_submission_q.Push({in_flight_request.initial,
-                                     (static_cast<uint8_t *>(in_flight_request.current) + cqe_res),
-                                     in_flight_request.remaining_size - cqe_res,
-                                     in_flight_request.offset,
-                                     in_flight_request.fd,
-                                     reinterpret_cast<std::atomic<IO_STATUS> *>(in_flight_request.result)});
+                                           (static_cast<uint8_t *>(in_flight_request.current) + cqe_res),
+                                           in_flight_request.remaining_size - cqe_res,
+                                           in_flight_request.offset,
+                                           in_flight_request.fd,
+                                           reinterpret_cast<std::atomic<IO_STATUS> *>(in_flight_request.result)});
             return;
         }
 
