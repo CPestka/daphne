@@ -88,6 +88,7 @@ struct URing {
     struct io_uring ring;
     int32_t ring_fd;
 
+    uint32_t total_slots;
     std::atomic<int32_t> remaining_slots;
 
     ThreadSafeStack<URingReadInternal> read_submission_q;
@@ -100,14 +101,14 @@ struct URing {
           bool use_io_dev_polling,
           bool use_sq_polling,
           uint32_t submission_queue_idle_timeout_in_ms);
-    
+
     ~URing();
 
     void Enqueue(const std::vector<URingReadInternal> &reads);
     void Enqueue(const std::vector<URingWriteInternal> &writes);
-    void SubmitRead();
-    void SubmitWrite();
-    void PeekCQAndHandleCQEs();
+    bool SubmitRead();
+    bool SubmitWrite();
+    bool PeekCQAndHandleCQEs();
 
     uint64_t GetUUID(IO_OP_CODE op_code, uint64_t slot_id);
     uint64_t GetSlotIdFromUUID(uint64_t uuid);

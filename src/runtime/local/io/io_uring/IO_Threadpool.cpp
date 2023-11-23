@@ -22,46 +22,115 @@
 #include <optional>
 #include <thread>
 #include <vector>
-#include <iostream>
 
 #include "AsyncUtil.h"
 #include "IO_URing.h"
 #include "IO_Threadpool.h"
 
-void CompletionWrapper(std::atomic<bool> *shut_down_requested, URing *ring) {
-    // TODO add cv stuff here
+void CompletionWrapper(std::atomic<bool> *shut_down_requested, URing *ring, std::atomic<bool> *sleep_cv) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> initially_idle_timestamp;
+    bool idle                                    = false;
+    constexpr uint64_t idle_timeout_threshold_ms = 20;
+
     while (!(*shut_down_requested)) {
-        ring->PeekCQAndHandleCQEs();
-    }
-}
-void SubmissionWrapper(std::atomic<bool> *shut_down_requested, URing *ring) {
-    // TODO add cv stuff here
-    while (!(*shut_down_requested)) {
-        ring->SubmitRead();
-        ring->SubmitWrite();
+        bool proccessed_a_cqe = false;
+        for (size_t i = 0; i < 100; i++) {
+            if (ring->PeekCQAndHandleCQEs()) {
+                proccessed_a_cqe = true;
+            }
+        }
+
+        // we do this check here over directly going to check the q sizes since that involves atomic ops
+        if (!proccessed_a_cqe) {
+            // Check if any request are in flight
+            bool request_in_flight = (static_cast<int32_t>(ring->total_slots) == ring->remaining_slots.load());
+
+            if (request_in_flight) {
+                if (!idle) {    // No requests in flight -> begin timeout if not allready
+                    idle                     = true;
+                    initially_idle_timestamp = std::chrono::high_resolution_clock::now();
+                } else {    // Check if timedout y ? -> go to sleep
+                    if (static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                std::chrono::high_resolution_clock::now() - initially_idle_timestamp)
+                                                .count()) >= idle_timeout_threshold_ms) {
+                        *sleep_cv = false;
+                        sleep_cv->wait(false, std::memory_order_seq_cst);
+                        idle = false;
+                    }
+                }
+            } else { // we proccessed a cqe -> stop timer 
+                idle = false;
+            }
+        }
     }
 }
 
-struct URingRunner {
-    // TODO: add CVs for sleeping
-    URing ring;
-    std::atomic<bool> shut_down_requested;
-    std::thread submission_worker;
-    std::thread completion_worker;
-    URingRunner(uint32_t ring_size,
-                bool use_io_dev_polling,
-                bool use_sq_polling,
-                uint32_t submission_queue_idle_timeout_in_ms)
-        : ring(ring_size, use_io_dev_polling, use_sq_polling, submission_queue_idle_timeout_in_ms),
-          shut_down_requested(false), submission_worker(SubmissionWrapper, &shut_down_requested, &ring),
-          completion_worker(CompletionWrapper, &shut_down_requested, &ring) {};
+void SubmissionWrapper(std::atomic<bool> *shut_down_requested,
+                       URing *ring,
+                       std::atomic<bool> *sleep_cv,
+                       std::atomic<bool> *sleep_cv_of_completion_thread) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> initially_idle_timestamp;
+    bool idle                                    = false;
+    constexpr uint64_t idle_timeout_threshold_ms = 20;
 
-    ~URingRunner() {
-        shut_down_requested = true;
-        submission_worker.join();
-        completion_worker.join();
+    while (!(*shut_down_requested)) {
+        // More precisely it also tracks the attempt to submit requests i.e. it indicates whether we submited smth or tried
+        // but failed. If it is true either there are still the failed requests in the queue to submit again or we submited
+        //some requests last time -> likely that there are more and if not this should fail next round. -> this is an indicator
+        // if there is more work to be done or not without directly checking atomic q sizes
+        bool submitted_a_request = false;
+        for (size_t i = 0; i < 100; i++) {
+            if (ring->SubmitRead() || ring->SubmitWrite()) {
+                submitted_a_request = true;
+            }
+        }
+
+        if (submitted_a_request) {
+           // wakeup completion thread if if sleeps and we submited requests
+            bool expected_value_if_completion_thread_sleeps = false;
+            if (sleep_cv_of_completion_thread->compare_exchange_strong(
+                  expected_value_if_completion_thread_sleeps, true, std::memory_order_seq_cst)) {
+                sleep_cv_of_completion_thread->notify_one();
+            }
+        }
+
+        if (!submitted_a_request) {
+            if (!idle) {    // did not submit/try to submit a request -> begin timeout if not allready
+                idle                     = true;
+                initially_idle_timestamp = std::chrono::high_resolution_clock::now();
+            } else {    // Already started timer -> check if timedout -> go to sleep
+                if (static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                            std::chrono::high_resolution_clock::now() - initially_idle_timestamp)
+                                            .count()) >= idle_timeout_threshold_ms) {
+                    *sleep_cv = false;
+                    sleep_cv->wait(false, std::memory_order_seq_cst);
+                    idle = false;
+                }
+            }
+        } else {  // we submited a request -> stop timer 
+            idle = false;
+        }
     }
-};
+}
+
+URingRunner::URingRunner(uint32_t ring_size,
+                         bool use_io_dev_polling,
+                         bool use_sq_polling,
+                         uint32_t submission_queue_idle_timeout_in_ms)
+    : ring(ring_size, use_io_dev_polling, use_sq_polling, submission_queue_idle_timeout_in_ms),
+      shut_down_requested(false), submission_worker(SubmissionWrapper,
+                                                    &shut_down_requested,
+                                                    &ring,
+                                                    &submission_worker_should_be_active,
+                                                    &completion_worker_should_be_active),
+      completion_worker(CompletionWrapper, &shut_down_requested, &ring, &completion_worker_should_be_active),
+      submission_worker_should_be_active(true), completion_worker_should_be_active(true) {};
+
+URingRunner::~URingRunner() {
+    shut_down_requested = true;
+    submission_worker.join();
+    completion_worker.join();
+}
 
 IOThreadpool::IOThreadpool(uint32_t amount_of_io_urings,
                            uint32_t ring_size,
@@ -107,6 +176,13 @@ std::unique_ptr<std::atomic<IO_STATUS>[]> IOThreadpool::SubmitReads(const std::v
 
         runners[i]->ring.Enqueue(ring_read_batch);
 
+        // wakeup submission thread if required
+        bool expected_value_if_submission_thread_sleeps = false;
+        if (runners[i]->submission_worker_should_be_active.compare_exchange_strong(
+              expected_value_if_submission_thread_sleeps, true, std::memory_order_seq_cst)) {
+            runners[i]->submission_worker_should_be_active.notify_one();
+        }
+
         if (current_offset >= reads.size()) {
             break;
         }
@@ -142,6 +218,13 @@ std::unique_ptr<std::atomic<IO_STATUS>[]> IOThreadpool::SubmitWrites(const std::
 
         runners[i]->ring.Enqueue(ring_write_batch);
 
+        // wakeup submission thread if required
+        bool expected_value_if_submission_thread_sleeps = false;
+        if (runners[i]->submission_worker_should_be_active.compare_exchange_strong(
+              expected_value_if_submission_thread_sleeps, true, std::memory_order_seq_cst)) {
+            runners[i]->submission_worker_should_be_active.notify_one();
+        }
+
         if (current_offset >= writes.size()) {
             break;
         }
@@ -157,7 +240,7 @@ void IOThreadpool::SubmitReads(const std::vector<URingRead> &reads, std::vector<
     uint64_t current_offset = 0;
     for (size_t i = 0; i < runners.size(); i++) {
         uint64_t current_read_batch =
-          (reads.size() - current_offset) > reads_per_ring ? reads_per_ring: (reads.size() - current_offset);
+          (reads.size() - current_offset) > reads_per_ring ? reads_per_ring : (reads.size() - current_offset);
 
         std::vector<URingReadInternal> ring_read_batch;
         ring_read_batch.resize(current_read_batch);
@@ -174,7 +257,14 @@ void IOThreadpool::SubmitReads(const std::vector<URingRead> &reads, std::vector<
         current_offset += current_read_batch;
 
         runners[i]->ring.Enqueue(ring_read_batch);
-        
+
+        // wakeup submission thread if required
+        bool expected_value_if_submission_thread_sleeps = false;
+        if (runners[i]->submission_worker_should_be_active.compare_exchange_strong(
+              expected_value_if_submission_thread_sleeps, true, std::memory_order_seq_cst)) {
+            runners[i]->submission_worker_should_be_active.notify_one();
+        }
+
         if (current_offset >= reads.size()) {
             break;
         }
@@ -205,6 +295,13 @@ void IOThreadpool::SubmitWrites(const std::vector<URingWrite> &writes, std::vect
         current_offset += current_write_batch;
 
         runners[i]->ring.Enqueue(ring_write_batch);
+
+        // wakeup submission thread if required
+        bool expected_value_if_submission_thread_sleeps = false;
+        if (runners[i]->submission_worker_should_be_active.compare_exchange_strong(
+              expected_value_if_submission_thread_sleeps, true, std::memory_order_seq_cst)) {
+            runners[i]->submission_worker_should_be_active.notify_one();
+        }
 
         if (current_offset >= writes.size()) {
             break;

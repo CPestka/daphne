@@ -20,14 +20,30 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <thread>
 
 #include "AsyncUtil.h"
 #include "IO_URing.h"
 
-void CompletionWrapper(std::atomic<bool> *shut_down_requested, URing *ring);
-void SubmissionWrapper(std::atomic<bool> *shut_down_requested, URing *ring);
+void CompletionWrapper(std::atomic<bool> *shut_down_requested, URing *ring, std::atomic<bool> *sleep_cv);
+void SubmissionWrapper(std::atomic<bool> *shut_down_requested,
+                       URing *ring,
+                       std::atomic<bool> *sleep_cv,
+                       std::atomic<bool> *sleep_cv_of_completion_thread);
 
-struct URingRunner;
+struct URingRunner{
+    URing ring;
+    std::atomic<bool> shut_down_requested;
+    std::thread submission_worker;
+    std::thread completion_worker;
+    std::atomic<bool> submission_worker_should_be_active;
+    std::atomic<bool> completion_worker_should_be_active;
+    URingRunner(uint32_t ring_size,
+                bool use_io_dev_polling,
+                bool use_sq_polling,
+                uint32_t submission_queue_idle_timeout_in_ms);
+    ~URingRunner();
+};
 
 struct IOThreadpool {
     std::vector<URingRunner *> runners;

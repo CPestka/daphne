@@ -195,7 +195,6 @@ TEST_CASE("Async-PartialReadZarr->ChunkedTensor+SQPoll", TAG_IO) {
 
 TEST_CASE("Async-PartialReadZarr->ChunkedTensor+SQPoll+MultipleRings", TAG_IO) {
     IOThreadpool io_uring_pool(4, 4096, false, true, 1000);
-    std::cout << "1" << std::endl;
     ChunkedTensor<double>* ct_ptr;
 
     // Read in [100,100,100] fp64 tensor with chunking [10,10,10]
@@ -205,7 +204,6 @@ TEST_CASE("Async-PartialReadZarr->ChunkedTensor+SQPoll+MultipleRings", TAG_IO) {
                                     &io_uring_pool);
 
     std::chrono::time_point<std::chrono::high_resolution_clock> t1 = std::chrono::high_resolution_clock::now();
-    std::cout << "2" << std::endl;
 
     bool all_data_arrived = false;
     bool data_1_arrived = false;
@@ -227,7 +225,6 @@ TEST_CASE("Async-PartialReadZarr->ChunkedTensor+SQPoll+MultipleRings", TAG_IO) {
             break;
         }
     }
-    std::cout << "3" << std::endl;
 
     REQUIRE(all_data_arrived);
 

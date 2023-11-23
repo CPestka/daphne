@@ -95,3 +95,113 @@ TEST_CASE("io_uring basic File R/W test", TAG_IO) {
         REQUIRE(result_page[i] == 42);
     }
 }
+
+TEST_CASE("io_uring sleep cv test", TAG_IO) {
+    IOThreadpool io_pool(1, 64, false, false, 1000);
+
+    int fd = open("./test/runtime/local/io/uring_test_tmp", O_CREAT | O_RDWR | O_DIRECT | O_TRUNC, S_IRUSR | S_IWUSR);
+    REQUIRE(fd > 0);
+
+    auto data_page   = std::make_unique<uint64_t[]>(4096 / sizeof(uint64_t));
+    auto result_page = std::make_unique<uint64_t[]>(4096 / sizeof(uint64_t));
+    for (size_t i = 0; i < (4096 / sizeof(uint64_t)); i++) {
+        data_page[i]   = 42;
+        result_page[i] = 0;
+    }
+
+    // The write
+    std::vector<URingWrite> write_requests;
+    write_requests.push_back({data_page.get(), 4096, 0, fd});
+
+    std::unique_ptr<std::atomic<IO_STATUS>[]> write_future = io_pool.SubmitWrites(write_requests);
+
+    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
+    bool timed_out = false;
+    while (write_future[0] == IO_STATUS::IN_FLIGHT) {
+        if (static_cast<uint64_t>(
+              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+                .count()) > 3000) {
+            timed_out = true;
+            break;
+        }
+    }
+    REQUIRE(!timed_out);
+
+    REQUIRE(write_future[0] == IO_STATUS::SUCCESS);
+
+    // The Read
+    std::vector<URingRead> read_requests;
+    read_requests.push_back({result_page.get(), 4096, 0, fd});
+
+    std::unique_ptr<std::atomic<IO_STATUS>[]> read_future = io_pool.SubmitReads(read_requests);
+
+    timed_out = false;
+    start     = std::chrono::high_resolution_clock::now();
+    while (read_future[0] == IO_STATUS::IN_FLIGHT) {
+        if (static_cast<uint64_t>(
+              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+                .count()) > 3000) {
+            timed_out = true;
+            break;
+        }
+    }
+    REQUIRE(!timed_out);
+
+    REQUIRE(read_future[0] == IO_STATUS::SUCCESS);
+
+    for (size_t i = 0; i < (4096 / sizeof(uint64_t)); i++) {
+        REQUIRE(result_page[i] == 42);
+    }
+
+    start = std::chrono::high_resolution_clock::now();
+
+    // Wait till threads timed out and went to sleep. Should happen after roughly idle_:timeout_threshold = 20ms 
+    while(static_cast<uint64_t>(
+              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+                .count()) < 500) {};
+    
+    // Threads should be sleeping
+    REQUIRE(!(io_pool.runners[0]->submission_worker_should_be_active));
+    REQUIRE(!(io_pool.runners[0]->completion_worker_should_be_active));
+
+    // Now do read write again and threads should wake up and everything should just work normaly
+    write_future = io_pool.SubmitWrites(write_requests);
+    start = std::chrono::high_resolution_clock::now();
+
+    timed_out = false;
+    while (write_future[0] == IO_STATUS::IN_FLIGHT) {
+        if (static_cast<uint64_t>(
+              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+                .count()) > 3000) {
+            timed_out = true;
+            break;
+        }
+    }
+    REQUIRE(!timed_out);
+
+    REQUIRE(write_future[0] == IO_STATUS::SUCCESS);
+
+    // The Read
+    read_requests.push_back({result_page.get(), 4096, 0, fd});
+
+    read_future = io_pool.SubmitReads(read_requests);
+
+    timed_out = false;
+    start     = std::chrono::high_resolution_clock::now();
+    while (read_future[0] == IO_STATUS::IN_FLIGHT) {
+        if (static_cast<uint64_t>(
+              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+                .count()) > 3000) {
+            timed_out = true;
+            break;
+        }
+    }
+    REQUIRE(!timed_out);
+
+    REQUIRE(read_future[0] == IO_STATUS::SUCCESS);
+
+    for (size_t i = 0; i < (4096 / sizeof(uint64_t)); i++) {
+        REQUIRE(result_page[i] == 42);
+    }
+}

@@ -32,8 +32,8 @@ URing::URing(uint32_t ring_size,
              bool use_io_dev_polling,
              bool use_sq_polling,
              uint32_t submission_queue_idle_timeout_in_ms)
-    : use_io_dev_polling(use_io_dev_polling), use_sq_polling(use_sq_polling), remaining_slots(ring_size),
-      in_flight_SQEs(ring_size) {
+    : use_io_dev_polling(use_io_dev_polling), use_sq_polling(use_sq_polling), total_slots(ring_size),
+      remaining_slots(ring_size), in_flight_SQEs(ring_size) {
     std::memset(&ring_para, 0, sizeof(ring_para));
 
     if (use_io_dev_polling) {
@@ -76,7 +76,7 @@ IO_OP_CODE URing::GetOPCodeFromUUID(uint64_t uuid) {
     return static_cast<IO_OP_CODE>(static_cast<uint8_t>(uuid & 0xff));
 }
 
-void URing::SubmitRead() {
+bool URing::SubmitRead() {
     constexpr uint64_t read_batch_size = 64;
 
     std::vector<URingReadInternal> reads  = read_submission_q.TryPop(read_batch_size);
@@ -166,9 +166,12 @@ void URing::SubmitRead() {
             in_flight_SQEs.template Free<false>(alloced_slots_for_sqe_meta_data[i]);
         }
     }
+
+    // Inform if there was !an attempt! to make progress -> use amount_of_requests_to_submit over requests_submited
+    return amount_of_requests_to_submit != 0;
 }
 
-void URing::SubmitWrite() {
+bool URing::SubmitWrite() {
     constexpr uint64_t write_batch_size = 64;
 
     std::vector<URingWriteInternal> writes = write_submission_q.TryPop(write_batch_size);
@@ -258,6 +261,9 @@ void URing::SubmitWrite() {
             in_flight_SQEs.template Free<false>(alloced_slots_for_sqe_meta_data[i]);
         }
     }
+
+    // Inform if there was !an attempt! to make progress -> use amount_of_requests_to_submit over requests_submited
+    return amount_of_requests_to_submit != 0;
 }
 
 void URing::HandleRead(uint64_t slot_id, int32_t cqe_res) {
@@ -344,7 +350,7 @@ void URing::HandleWrite(uint64_t slot_id, int32_t cqe_res) {
     }
 }
 
-void URing::PeekCQAndHandleCQEs() {
+bool URing::PeekCQAndHandleCQEs() {
     constexpr uint64_t peek_batch_size = 16;
     struct io_uring_cqe *cqes[peek_batch_size];
 
@@ -369,4 +375,6 @@ void URing::PeekCQAndHandleCQEs() {
     }
 
     remaining_slots += amount_of_fullfilled_requests;
+
+    return amount_of_fullfilled_requests != 0;
 }
