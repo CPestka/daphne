@@ -64,10 +64,10 @@ struct URingRunner {
 };
 
 IOThreadpool::IOThreadpool(uint32_t amount_of_io_urings,
-             uint32_t ring_size,
-             bool use_io_dev_polling,
-             bool use_sq_polling,
-             uint32_t submission_queue_idle_timeout_in_ms) {
+                           uint32_t ring_size,
+                           bool use_io_dev_polling,
+                           bool use_sq_polling,
+                           uint32_t submission_queue_idle_timeout_in_ms) {
     runners.resize(amount_of_io_urings);
     for (uint32_t i = 0; i < amount_of_io_urings; i++) {
         runners[i] =
@@ -89,7 +89,7 @@ std::unique_ptr<std::atomic<IO_STATUS>[]> IOThreadpool::SubmitReads(const std::v
     uint64_t current_offset = 0;
     for (size_t i = 0; i < runners.size(); i++) {
         uint64_t current_read_batch =
-          (reads.size() - current_offset) > reads_per_ring ? (reads.size() - current_offset) : reads_per_ring;
+          (reads.size() - current_offset) > reads_per_ring ? reads_per_ring : (reads.size() - current_offset);
 
         std::vector<URingReadInternal> ring_read_batch;
         ring_read_batch.resize(current_read_batch);
@@ -106,6 +106,10 @@ std::unique_ptr<std::atomic<IO_STATUS>[]> IOThreadpool::SubmitReads(const std::v
         current_offset += current_read_batch;
 
         runners[i]->ring.Enqueue(ring_read_batch);
+
+        if (current_offset >= reads.size()) {
+            break;
+        }
     }
 
     return results;
@@ -120,7 +124,7 @@ std::unique_ptr<std::atomic<IO_STATUS>[]> IOThreadpool::SubmitWrites(const std::
     uint64_t current_offset = 0;
     for (size_t i = 0; i < runners.size(); i++) {
         uint64_t current_write_batch =
-          (writes.size() - current_offset) > writes_per_ring ? (writes.size() - current_offset) : writes_per_ring;
+          (writes.size() - current_offset) > writes_per_ring ? writes_per_ring : (writes.size() - current_offset);
         std::vector<URingWriteInternal> ring_write_batch;
         ring_write_batch.resize(current_write_batch);
 
@@ -137,6 +141,10 @@ std::unique_ptr<std::atomic<IO_STATUS>[]> IOThreadpool::SubmitWrites(const std::
         current_offset += current_write_batch;
 
         runners[i]->ring.Enqueue(ring_write_batch);
+
+        if (current_offset >= writes.size()) {
+            break;
+        }
     }
 
     return results;
@@ -149,7 +157,7 @@ void IOThreadpool::SubmitReads(const std::vector<URingRead> &reads, std::vector<
     uint64_t current_offset = 0;
     for (size_t i = 0; i < runners.size(); i++) {
         uint64_t current_read_batch =
-          (reads.size() - current_offset) > reads_per_ring ? (reads.size() - current_offset) : reads_per_ring;
+          (reads.size() - current_offset) > reads_per_ring ? reads_per_ring: (reads.size() - current_offset);
 
         std::vector<URingReadInternal> ring_read_batch;
         ring_read_batch.resize(current_read_batch);
@@ -166,6 +174,10 @@ void IOThreadpool::SubmitReads(const std::vector<URingRead> &reads, std::vector<
         current_offset += current_read_batch;
 
         runners[i]->ring.Enqueue(ring_read_batch);
+        
+        if (current_offset >= reads.size()) {
+            break;
+        }
     }
 }
 
@@ -193,5 +205,9 @@ void IOThreadpool::SubmitWrites(const std::vector<URingWrite> &writes, std::vect
         current_offset += current_write_batch;
 
         runners[i]->ring.Enqueue(ring_write_batch);
+
+        if (current_offset >= writes.size()) {
+            break;
+        }
     }
 }
