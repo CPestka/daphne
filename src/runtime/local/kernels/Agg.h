@@ -46,10 +46,10 @@ concept Scalar_t = std::is_arithmetic<T>::value;
 
 template<typename VTRes, class DTArg>
 struct Agg {
-    static VTRes apply(AggOpCode opCode,
-                       const std::vector<bool>& aggregate_dimension,
-                       const DTArg* arg,
-                       DCTX(ctx)) = delete;
+    static VTRes* apply(AggOpCode opCode,
+                        const std::vector<bool>& aggregate_dimension,
+                        const DTArg* arg,
+                        DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
@@ -58,11 +58,11 @@ struct Agg {
 
 template<typename VTRes, class DTArg>
 struct AggSparse {
-    static VTRes apply(AggOpCode opCode,
-                       const std::vector<bool>& aggregate_dimension,
-                       const std::vector<std::vector<size_t>>& chunk_list,
-                       const DTArg* arg,
-                       DCTX(ctx)) = delete;
+    static VTRes* apply(AggOpCode opCode,
+                        const std::vector<bool>& aggregate_dimension,
+                        const std::vector<std::vector<size_t>>& chunk_list,
+                        const DTArg* arg,
+                        DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
@@ -70,25 +70,25 @@ struct AggSparse {
 // ****************************************************************************
 
 template<typename VTRes, class DTArg>
-VTRes agg(AggOpCode opCode, const std::vector<bool>& aggregate_dimension, const DTArg* arg, DCTX(ctx)) {
+VTRes* agg(AggOpCode opCode, const std::vector<bool>& aggregate_dimension, const DTArg* arg, DCTX(ctx)) {
     return Agg<VTRes, DTArg>::apply(opCode, aggregate_dimension, arg, ctx);
 }
 
 template<typename VTRes, class DTArg>
-VTRes agg(AggOpCode opCode,
-          const std::vector<bool>& aggregate_dimension,
-          const std::vector<std::vector<size_t>>& chunk_list,
-          const DTArg* arg,
-          DCTX(ctx)) {
+VTRes* agg(AggOpCode opCode,
+           const std::vector<bool>& aggregate_dimension,
+           const std::vector<std::vector<size_t>>& chunk_list,
+           const DTArg* arg,
+           DCTX(ctx)) {
     return AggSparse<VTRes, DTArg>::apply(opCode, aggregate_dimension, chunk_list, arg, ctx);
 }
 
 template<typename VTRes, class DTArg>
-VTRes agg(AggOpCode opCode,
-          const std::vector<bool>& aggregate_dimension,
-          const std::vector<std::pair<size_t, size_t>>& chunk_ranges,
-          const DTArg* arg,
-          DCTX(ctx)) {
+VTRes* agg(AggOpCode opCode,
+           const std::vector<bool>& aggregate_dimension,
+           const std::vector<std::pair<size_t, size_t>>& chunk_ranges,
+           const DTArg* arg,
+           DCTX(ctx)) {
     return AggSparse<VTRes, DTArg>::apply(
       opCode, aggregate_dimension, arg->GetChunkListFromIdRange(chunk_ranges), arg, ctx);
 }
@@ -143,7 +143,7 @@ std::vector<std::vector<std::vector<size_t>>> GetChunkAggregationLists(
         std::vector<size_t> current_ids = chunk_list.back();
         chunk_list.pop_back();
 
-        chunk_lists.push_back();
+        chunk_lists.push_back({{}});
         chunk_lists.back().push_back(current_ids);
 
         for (size_t i = 0; i < chunk_list.size(); i++) {
@@ -270,7 +270,7 @@ struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
                 throw std::runtime_error(
                   "Applying mean and stddev over more than one dim at once is currently not supported");
             }
-            
+
             bool no_aggregation_dim = true;
             for (size_t i = 0; i < rank; i++) {
                 if (aggregate_dimension[i]) {
@@ -655,35 +655,62 @@ void AggChunkList(VTRes* dest,
     }
 }
 
-template<Scalar_t VTRes, Scalar_t VTArg>
-void AggChunkOPDispatch(AggOpCode opCode,
-                        VTRes* dest,
-                        VTArg* src,
-                        const std::vector<size_t>& chunk_shape,
-                        size_t chunk_size,
-                        const std::vector<bool>& aggregation_dimension,
-                        bool is_initial_chunk_in_dest_location) {
-    switch (opCode) {
-        using enum AggOpCode;
-        case MIN:
-            AggChunk<VTRes, VTArg, AggOpCode::MIN>(
-              dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
-            break;
-        case MAX:
-            AggChunk<VTRes, VTArg, AggOpCode::MAX>(
-              dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
-            break;
-        case SUM:
-            AggChunk<VTRes, VTArg, AggOpCode::MIN>(
-              dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
-            break;
-        case PROD:
-            AggChunk<VTRes, VTArg, AggOpCode::MIN>(
-              dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
-            break;
-        default:
-            // TODO: IDXmin/max, stddev mean
-            throw std::runtime_error("unsupported op_code reached");
+bool IsFirstEntryInAggDim(size_t linear_id, const std::vector<size_t>& strides, size_t aggregation_dim) {
+    size_t rank = strides.size();
+    for (size_t i = 0; i < rank; i++) {
+        if (i == aggregation_dim) {
+            return (linear_id / strides[i]) == 0;
+        }
+        linear_id = linear_id % strides[i];
+    }
+    // unreachable
+    throw std::runtime_error("unreachable control flow reached");
+    return false;
+}
+
+template<Scalar_t VTRes, Scalar_t VTArg, AggOpCode opCode>
+void AggChunkSingleDim(VTRes* dest,
+                       VTArg* src,
+                       const std::vector<size_t>& chunk_shape,
+                       const std::vector<size_t>& src_chunk_strides,
+                       const std::vector<size_t>& dest_chunk_strides,
+                       size_t chunk_size,
+                       size_t aggregate_dimension) {
+    size_t dest_chunk_size = chunk_size / chunk_shape[aggregate_dimension];
+    size_t rank            = chunk_shape.size();
+
+    for (size_t i = 0; i < dest_chunk_size; i++) {
+        std::vector<size_t> ids;
+        ids.resize(rank);
+        size_t tmp = i;
+        for (int32_t j = rank - 1; j >= 0; j--) {
+            ids[j] = tmp / dest_chunk_strides[j];
+            tmp    = tmp % dest_chunk_strides[j];
+        }
+
+        size_t zero_element_in_agg_dim_linear_id = 0;
+        for (size_t j = 0; j < rank; j++) {
+            zero_element_in_agg_dim_linear_id += (ids[j] * src_chunk_strides[j]);
+        }
+
+        dest[i] = static_cast<VTRes>(src[zero_element_in_agg_dim_linear_id]);
+
+        for (size_t j = 1; j < chunk_shape[aggregate_dimension]; j++) {
+            size_t current_offset = zero_element_in_agg_dim_linear_id + (j * src_chunk_strides[aggregate_dimension]);
+
+            if constexpr (opCode == AggOpCode::SUM) {
+                dest[i] += static_cast<VTRes>(src[current_offset]);
+            } else if constexpr (opCode == AggOpCode::PROD) {
+                dest[i] *= static_cast<VTRes>(src[current_offset]);
+            } else if constexpr (opCode == AggOpCode::MIN) {
+                dest[i] = std::min(dest[i], static_cast<VTRes>(src[current_offset]));
+            } else if constexpr (opCode == AggOpCode::MAX) {
+                dest[i] = std::max(dest[i], static_cast<VTRes>(src[current_offset]));
+            } else {
+                throw std::runtime_error("unsupported op_code reached");
+                // Todo handle idxmin/max and mean stddev further up
+            }
+        }
     }
 }
 
@@ -695,6 +722,7 @@ void AggChunk(VTRes* dest,
               const std::vector<bool>& aggregate_dimension,
               bool is_initial_chunk_in_dest_location) {
     size_t rank = chunk_shape.size();
+
     if (rank == 0) {
         dest[0] = static_cast<VTRes>(src[0]);
         return;
@@ -719,34 +747,40 @@ void AggChunk(VTRes* dest,
     VTRes* current_src;    // used after the first swap
     size_t current_chunk_size = chunk_size;
 
-    std::vector<size_t> chunk_strides;
-    chunk_strides.resize(rank);
+    std::vector<size_t> src_chunk_strides;
+    std::vector<size_t> dest_chunk_strides;
+    src_chunk_strides.resize(rank);
+    dest_chunk_strides.resize(rank);
 
     bool is_first_swap = true;
     for (size_t i = 0; i < chunk_shape.size(); i++) {
         // Ignore dims not flaged for reduction
         if (aggregate_dimension[i]) {
             // recalculate strides since they change in each iteration
-            chunk_strides[0] = 1;
-            for (size_t j = 1; j < rank - 1; j++) {
-                chunk_strides[j] = chunk_strides[j - 1] * chunk_shape[j - 1];
+            src_chunk_strides[0]  = 1;
+            dest_chunk_strides[0] = 1;
+            for (size_t j = 1; j < rank; j++) {
+                src_chunk_strides[j] = src_chunk_strides[j - 1] * chunk_shape[j - 1];
+                if ((j-1) == i) {
+                    dest_chunk_strides[j] = dest_chunk_strides[j - 1];
+                } else {
+                    dest_chunk_strides[j] = dest_chunk_strides[j - 1] * chunk_shape[j - 1];
+                }
             }
 
             if (is_first_swap) {
                 AggChunkSingleDim<VTRes, VTArg, opCode>(
-                  current_dest, src, chunk_shape, chunk_strides, current_chunk_size, i);
+                  current_dest, src, chunk_shape, src_chunk_strides, dest_chunk_strides, current_chunk_size, i);
                 current_src  = current_dest;
                 current_dest = &(scratch_space[chunk_size]);
             } else {
                 AggChunkSingleDim<VTRes, VTRes, opCode>(
-                  current_dest, current_src, chunk_shape, chunk_strides, current_chunk_size, i);
+                  current_dest, current_src, chunk_shape, src_chunk_strides, dest_chunk_strides, current_chunk_size, i);
                 std::swap(current_src, current_dest);
             }
             current_chunk_size = current_chunk_size / chunk_shape[i];
             chunk_shape[i]     = 1;
 
-            // adjust shape and strides and size
-            // swap ptrs
             is_first_swap = false;
         }
     }
@@ -768,12 +802,12 @@ void AggChunk(VTRes* dest,
                 break;
             case MIN:
                 for (size_t i = 0; i < current_chunk_size; i++) {
-                    dest[i] += current_src[i];
+                    dest[i] = std::min(dest[i], current_src[i]);
                 }
                 break;
             case MAX:
                 for (size_t i = 0; i < current_chunk_size; i++) {
-                    dest[i] += current_src[i];
+                    dest[i] = std::max(dest[i], current_src[i]);
                 }
                 break;
             default:
@@ -783,46 +817,34 @@ void AggChunk(VTRes* dest,
     }
 }
 
-bool IsFirstEntryInAggDim(size_t linear_id, const std::vector<size_t>& strides, size_t aggregation_dim) {
-    size_t rank = strides.size();
-    for (size_t i = 0; i < rank; i++) {
-        if (i == aggregation_dim) {
-            return (linear_id / strides[i]) == 0;
-        }
-        linear_id = linear_id % strides[i];
-    }
-    // unreachable
-    throw std::runtime_error("unreachable control flow reached");
-    return false;
-}
-
-template<Scalar_t VTRes, Scalar_t VTArg, AggOpCode opCode>
-void AggChunkSingleDim(VTRes* dest,
-                       VTArg* src,
-                       const std::vector<size_t>& chunk_shape,
-                       const std::vector<size_t>& chunk_strides,
-                       size_t chunk_size,
-                       size_t aggregate_dimension,
-                       bool is_only_chunk_to_agg) {
-    for (size_t i = 0; i < chunk_size; i++) {
-        if (!IsFirstEntryInAggDim(i, chunk_strides, aggregate_dimension)) {
-            continue;
-        }
-
-        dest[i] = static_cast<VTRes>(src[i]);
-        for (size_t j = 1; j < chunk_shape[aggregate_dimension]; j++) {
-            if constexpr (opCode == AggOpCode::SUM) {
-                dest[i] += static_cast<VTRes>(src[i + (j * chunk_strides[aggregate_dimension])]);
-            } else if constexpr (opCode == AggOpCode::PROD) {
-                dest[i] *= static_cast<VTRes>(src[i + (j * chunk_strides[aggregate_dimension])]);
-            } else if constexpr (opCode == AggOpCode::MIN) {
-                dest[i] = std::min(dest[i], static_cast<VTRes>(src[i + (j * chunk_strides[aggregate_dimension])]));
-            } else if constexpr (opCode == AggOpCode::MAX) {
-                dest[i] = std::min(dest[i], static_cast<VTRes>(src[i + (j * chunk_strides[aggregate_dimension])]));
-            } else {
-                throw std::runtime_error("unsupported op_code reached");
-                // Todo handle idxmin/max and mean stddev further up
-            }
-        }
+template<Scalar_t VTRes, Scalar_t VTArg>
+void AggChunkOPDispatch(AggOpCode opCode,
+                        VTRes* dest,
+                        VTArg* src,
+                        const std::vector<size_t>& chunk_shape,
+                        size_t chunk_size,
+                        const std::vector<bool>& aggregation_dimension,
+                        bool is_initial_chunk_in_dest_location) {
+    switch (opCode) {
+        using enum AggOpCode;
+        case MIN:
+            AggChunk<VTRes, VTArg, AggOpCode::MIN>(
+              dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
+            break;
+        case MAX:
+            AggChunk<VTRes, VTArg, AggOpCode::MAX>(
+              dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
+            break;
+        case SUM:
+            AggChunk<VTRes, VTArg, AggOpCode::SUM>(
+              dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
+            break;
+        case PROD:
+            AggChunk<VTRes, VTArg, AggOpCode::PROD>(
+              dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
+            break;
+        default:
+            // TODO: IDXmin/max, stddev mean
+            throw std::runtime_error("unsupported op_code reached");
     }
 }

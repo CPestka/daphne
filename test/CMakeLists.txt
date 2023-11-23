@@ -83,6 +83,7 @@ set(TEST_SOURCES
         runtime/local/kernels/AggColTest.cpp
         runtime/local/kernels/AggCumTest.cpp
         runtime/local/kernels/AggRowTest.cpp
+        runtime/local/kernels/AggTest.cpp
         runtime/local/kernels/CartesianTest.cpp
         runtime/local/kernels/CastObjTest.cpp
         runtime/local/kernels/CastObjScaTest.cpp
