@@ -28,28 +28,151 @@
 #include <vector>
 
 TEST_CASE("Agg-ContiguousTensor", TAG_KERNELS) {
-    auto t1 = DataObjectFactory::create<ContiguousTensor<uint32_t>>(std::vector<size_t>({3,3,3}), InitCode::IOTA);
-    auto tmod = DataObjectFactory::create<ContiguousTensor<uint64_t>>(std::vector<size_t>({3,3,2}), InitCode::IOTA);
+    auto t1   = DataObjectFactory::create<ContiguousTensor<uint32_t>>(std::vector<size_t>({3, 3, 3}), InitCode::IOTA);
+    auto tmod = DataObjectFactory::create<ContiguousTensor<uint64_t>>(std::vector<size_t>({3, 3, 2}), InitCode::IOTA);
     tmod->data[0] = 1;
 
-    ContiguousTensor<uint32_t>* t2 = agg<ContiguousTensor<uint32_t>,ContiguousTensor<uint32_t>>(AggOpCode::SUM, std::vector<bool>({true,true,true}), t1, nullptr);
-    ContiguousTensor<uint64_t>* t3 = agg<ContiguousTensor<uint64_t>,ContiguousTensor<uint64_t>>(AggOpCode::PROD, std::vector<bool>({true,true,true}), tmod, nullptr);
-    ContiguousTensor<uint32_t>* t4 = agg<ContiguousTensor<uint32_t>,ContiguousTensor<uint32_t>>(AggOpCode::MIN, std::vector<bool>({true,true,true}), t1, nullptr);
-    ContiguousTensor<uint32_t>* t5 = agg<ContiguousTensor<uint32_t>,ContiguousTensor<uint32_t>>(AggOpCode::MAX, std::vector<bool>({true,true,true}), t1, nullptr);
-    
-    REQUIRE((t2->tensor_shape == std::vector<size_t>({1,1,1})));
+    ContiguousTensor<uint32_t>* t2 = agg<ContiguousTensor<uint32_t>, ContiguousTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({true, true, true}), t1, nullptr);
+    ContiguousTensor<uint64_t>* t3 = agg<ContiguousTensor<uint64_t>, ContiguousTensor<uint64_t>>(
+      AggOpCode::PROD, std::vector<bool>({true, true, true}), tmod, nullptr);
+    ContiguousTensor<uint32_t>* t4 = agg<ContiguousTensor<uint32_t>, ContiguousTensor<uint32_t>>(
+      AggOpCode::MIN, std::vector<bool>({true, true, true}), t1, nullptr);
+    ContiguousTensor<uint32_t>* t5 = agg<ContiguousTensor<uint32_t>, ContiguousTensor<uint32_t>>(
+      AggOpCode::MAX, std::vector<bool>({true, true, true}), t1, nullptr);
+
+    REQUIRE((t2->tensor_shape == std::vector<size_t>({1, 1, 1})));
+    REQUIRE(t2->data[0] == 351);
     REQUIRE(t3->data[0] == 355687428096000);
     REQUIRE(t4->data[0] == 0);
     REQUIRE(t5->data[0] == 26);
-    
-    auto tc = DataObjectFactory::create<ContiguousTensor<uint32_t>>(std::vector<size_t>({3,3,3}), InitCode::NONE);
-    for(size_t i=0; i<27; i++) {
+
+    auto tc = DataObjectFactory::create<ContiguousTensor<uint32_t>>(std::vector<size_t>({3, 3, 3}), InitCode::NONE);
+    for (size_t i = 0; i < 27; i++) {
         tc->data[i] = 1;
     }
 
-    ContiguousTensor<uint32_t>* tc1 = agg<ContiguousTensor<uint32_t>,ContiguousTensor<uint32_t>>(AggOpCode::SUM, std::vector<bool>({false,true,true}), tc, nullptr);
-    REQUIRE(tc1->tensor_shape == std::vector<size_t>({3,1,1}));
-    for(size_t i=0; i<3; i++) {
-        REQUIRE(tc1->get({i,0,0}) == 9);
+    ContiguousTensor<uint32_t>* tc1 = agg<ContiguousTensor<uint32_t>, ContiguousTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({false, true, true}), tc, nullptr);
+    REQUIRE(tc1->tensor_shape == std::vector<size_t>({3, 1, 1}));
+    for (size_t i = 0; i < 3; i++) {
+        REQUIRE(tc1->get({i, 0, 0}) == 9);
     }
+}
+
+TEST_CASE("Agg-ChunkedTensor", TAG_KERNELS) {
+    auto t = DataObjectFactory::create<ChunkedTensor<uint32_t>>(
+      std::vector<size_t>({4, 4}), std::vector<size_t>({4, 2}), InitCode::IOTA);
+    auto t1 = DataObjectFactory::create<ChunkedTensor<uint32_t>>(
+      std::vector<size_t>({4, 4, 2}), std::vector<size_t>({2, 1, 2}), InitCode::IOTA);
+    auto tmod = DataObjectFactory::create<ChunkedTensor<uint64_t>>(
+      std::vector<size_t>({2, 4, 2}), std::vector<size_t>({2, 1, 2}), InitCode::IOTA);
+    tmod->data[0] = 1;
+
+    // Very simple just 2D and 2 chunks
+    ChunkedTensor<uint32_t>* ta = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({true, true}), t, nullptr);
+    REQUIRE((ta->tensor_shape == std::vector<size_t>({1, 1})));
+    REQUIRE((ta->chunk_shape == std::vector<size_t>({1, 1})));
+    REQUIRE(ta->data[0] == 120);
+
+    // 3D still reduce all dims, different OPs
+    ChunkedTensor<uint32_t>* t2 = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({true, true, true}), t1, nullptr);
+    ChunkedTensor<uint64_t>* t3 = agg<ChunkedTensor<uint64_t>, ChunkedTensor<uint64_t>>(
+      AggOpCode::PROD, std::vector<bool>({true, true, true}), tmod, nullptr);
+    ChunkedTensor<uint32_t>* t4 = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::MIN, std::vector<bool>({true, true, true}), t1, nullptr);
+    ChunkedTensor<uint32_t>* t5 = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::MAX, std::vector<bool>({true, true, true}), t1, nullptr);
+
+    REQUIRE((t2->tensor_shape == std::vector<size_t>({1, 1, 1})));
+    REQUIRE((t2->chunk_shape == std::vector<size_t>({1, 1, 1})));
+    REQUIRE(t2->data[0] == 496);
+    REQUIRE(t3->data[0] == 1307674368000);
+    REQUIRE(t4->data[0] == 0);
+    REQUIRE(t5->data[0] == 31);
+
+    // 3D reduce 2 dims
+    auto tc = DataObjectFactory::create<ChunkedTensor<uint32_t>>(
+      std::vector<size_t>({4, 4, 2}), std::vector<size_t>({2, 1, 2}), InitCode::IOTA);
+    for (size_t i = 0; i < 32; i++) {
+        tc->data[i] = 1;
+    }
+    ChunkedTensor<uint32_t>* tc1 = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({false, true, true}), tc, nullptr);
+    ChunkedTensor<uint32_t>* tc2 = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({true, false, true}), tc, nullptr);
+
+    REQUIRE(tc1->tensor_shape == std::vector<size_t>({4, 1, 1}));
+    REQUIRE(tc1->chunk_shape == std::vector<size_t>({2, 1, 1}));
+    REQUIRE(tc2->tensor_shape == std::vector<size_t>({1, 4, 1}));
+    REQUIRE(tc2->chunk_shape == std::vector<size_t>({1, 1, 1}));
+
+    for (size_t i = 0; i < 4; i++) {
+        REQUIRE(tc1->get({i, 0, 0}) == 8);
+        REQUIRE(tc2->get({0, i, 0}) == 8);
+    }
+
+    // Reduce no dim i.e. NOOP
+    ChunkedTensor<uint32_t>* tc3 = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({false, false, false}), tc, nullptr);
+
+    REQUIRE(tc3->tensor_shape == std::vector<size_t>({4, 4, 2}));
+    REQUIRE(tc3->chunk_shape == std::vector<size_t>({2, 1, 2}));
+    for (size_t i = 0; i < 32; i++) {
+        REQUIRE(tc3->data[i] == tc->data[i]);
+    }
+}
+
+TEST_CASE("Agg-ChunkedTensor-Sparse", TAG_KERNELS) {
+    auto t = DataObjectFactory::create<ChunkedTensor<uint32_t>>(
+      std::vector<size_t>({4, 4, 4}), std::vector<size_t>({4, 2, 2}), InitCode::IOTA);
+
+    // Agg over all dims but only supply [0,1) interval in last dim
+    ChunkedTensor<uint32_t>* tr1 = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({true, true, true}), {{0, 1}, {0, 2}, {0, 1}}, t, nullptr);
+
+    REQUIRE(tr1->tensor_shape == std::vector<size_t>({1, 1, 1}));
+    REQUIRE(tr1->chunk_shape == std::vector<size_t>({1, 1, 1}));
+
+    REQUIRE(tr1->data[0] == 496);
+
+    ChunkedTensor<uint32_t>* tr2 = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({true, true, true}), {{0, 1}, {0, 1}, {0, 1}}, t, nullptr);
+
+    REQUIRE(tr2->tensor_shape == std::vector<size_t>({1, 1, 1}));
+    REQUIRE(tr2->chunk_shape == std::vector<size_t>({1, 1, 1}));
+
+    size_t expected = 0;
+    for (size_t i = 0; i < 4; i++) {
+        for (size_t j = 0; j < 2; j++) {
+            for (size_t k = 0; k < 2; k++) {
+                expected += t->get({i, j, k});
+            }
+        }
+    }
+    REQUIRE(tr2->data[0] == expected);
+
+    auto t2 = DataObjectFactory::create<ChunkedTensor<uint32_t>>(
+      std::vector<size_t>({4, 4, 4}), std::vector<size_t>({4, 2, 1}), InitCode::IOTA);
+
+    ChunkedTensor<uint32_t>* t2r1 = agg<ChunkedTensor<uint32_t>, ChunkedTensor<uint32_t>>(
+      AggOpCode::SUM, std::vector<bool>({true, true, false}), {{0, 1}, {0, 1}, {0, 4}}, t2, nullptr);
+
+    REQUIRE(t2r1->tensor_shape == std::vector<size_t>({1, 1, 4}));
+    REQUIRE(t2r1->chunk_shape == std::vector<size_t>({1, 1, 1}));
+
+    size_t exp[4] = {0,0,0,0};
+    for (size_t i = 0; i < 4; i++) {
+        for (size_t j = 0; j < 2; j++) {
+          for(size_t k=0; k<4; k++) {
+            exp[k] += t->get({i, j, k});
+          }
+        }
+    }
+    REQUIRE(t2r1->data[0] == exp[0]);
+    REQUIRE(t2r1->data[1] == exp[1]);
+    REQUIRE(t2r1->data[2] == exp[2]);
+    REQUIRE(t2r1->data[3] == exp[3]);
 }

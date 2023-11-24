@@ -65,6 +65,7 @@ precompiled-dependencies/
 !test/**/*.mlir
 !test/**/*.daphne
 
-# cuda debug files of unknown source :)
 /compiler-debug-cuda.txt
 /compiler-trace-cuda.txt
+
+/uring_test_tmp

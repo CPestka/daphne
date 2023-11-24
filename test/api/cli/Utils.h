@@ -28,6 +28,7 @@
 
 #include <grpcpp/server.h>
 
+#include <cstring>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -75,17 +76,23 @@ int runProgram(std::stringstream & out, std::stringstream & err, const char * ex
     char buf[1024]; // internal buffer for reading from the pipes
     
     // Try to create the pipes.
-    if(pipe(linkOut) == -1)
-        throw std::runtime_error("could not create pipe");
-    if(pipe(linkErr) == -1)
-        throw std::runtime_error("could not create pipe");
+    if(pipe(linkOut) == -1){
+        int err = errno;
+        throw std::runtime_error("could not create pipe. Errno: " + std::string(strerror(err)));
+    }
+
+    if(pipe(linkErr) == -1){
+        int err = errno;
+        throw std::runtime_error("could not create pipe. Errno: " + std::string(strerror(err)));
+    }
     
     // Try to create the child process.
     pid_t p = fork();
     
-    if(p == -1)
-        throw std::runtime_error("could not create child process");
-    else if(p) { // parent
+    if(p == -1){
+        int err = errno;
+        throw std::runtime_error("could not create child process. Errno: " + std::string(strerror(err)));
+    }  else if(p) { // parent
         // Close write end of pipes.
         close(linkOut[1]);
         close(linkErr[1]);
@@ -112,8 +119,14 @@ int runProgram(std::stringstream & out, std::stringstream & err, const char * ex
     }
     else { // child
         // Redirect stdout and stderr to the pipe.
-        dup2(linkOut[1], STDOUT_FILENO);
-        dup2(linkErr[1], STDERR_FILENO);
+        if (dup2(linkOut[1], STDOUT_FILENO) == -1) {
+            int err = errno;
+            throw std::runtime_error("could not dup2 stdout and pipe. Errno: " + std::string(strerror(err)));
+        }
+        if (dup2(linkErr[1], STDERR_FILENO) == -1) {
+            int err = errno;
+            throw std::runtime_error("could not dup2 stderr and pipe. Errno: " + std::string(strerror(err)));
+        }
         close(linkOut[0]);
         close(linkOut[1]);
         close(linkErr[0]);
@@ -123,7 +136,8 @@ int runProgram(std::stringstream & out, std::stringstream & err, const char * ex
         execl(execPath, args..., static_cast<char *>(nullptr));
         
         // execl does not return, unless it failed.
-        throw std::runtime_error("could not execute the program");
+        int err = errno;
+        throw std::runtime_error("could not execute the program. Errno: " + std::string(strerror(err)));
     }
 }
 
@@ -145,9 +159,10 @@ pid_t runProgramInBackground(int &out, int &err, const char * execPath, Args ...
     // Try to create the child process.
     pid_t p = fork();
     
-    if(p == -1)
-        throw std::runtime_error("could not create child process");
-    else if(p) { // parent        
+    if(p == -1) {
+        int err = errno;
+        throw std::runtime_error("could not create child process. Errono: " + std::string(strerror(err)));
+    } else if(p) { // parent        
         // Return pid
         return p;
     }
@@ -155,11 +170,20 @@ pid_t runProgramInBackground(int &out, int &err, const char * execPath, Args ...
         // Redirect stdout and stderr to the pipe.
         dup2(out, STDOUT_FILENO);
         dup2(err, STDERR_FILENO);
+        if (dup2(out, STDOUT_FILENO) == -1) {
+            int err = errno;
+            throw std::runtime_error("could not dup2 stdout and pipe. Errno: " + std::string(strerror(err)));
+        }
+        if (dup2(err, STDERR_FILENO) == -1) {
+            int err = errno;
+            throw std::runtime_error("could not dup2 stderr and pipe. Errno: " + std::string(strerror(err)));
+        }
         // Execute other program.
         execl(execPath, args..., static_cast<char *>(nullptr));
         
         // execl does not return, unless it failed.
-        throw std::runtime_error("could not execute the program");
+        int err = errno;
+        throw std::runtime_error("could not execute the program" + std::string(strerror(err)));
     }
 }
 

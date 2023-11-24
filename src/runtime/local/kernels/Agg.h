@@ -37,6 +37,11 @@
 
 // TODO: IDXmin/max, handle stddev and mean for contiguous tensor
 
+// The arg are not const here since the kernels check and update the materilization flags / io status of chunks
+// The alternative way of doing this would be to add callbacks that do that to the io engine so th compute kernels do
+// not have to modify the arg tensor
+// TODO handle overhanging chunks properly
+
 template<typename T>
 concept Scalar_t = std::is_arithmetic<T>::value;
 
@@ -46,10 +51,7 @@ concept Scalar_t = std::is_arithmetic<T>::value;
 
 template<typename VTRes, class DTArg>
 struct Agg {
-    static VTRes* apply(AggOpCode opCode,
-                        const std::vector<bool>& aggregate_dimension,
-                        const DTArg* arg,
-                        DCTX(ctx)) = delete;
+    static VTRes* apply(AggOpCode opCode, const std::vector<bool>& aggregate_dimension, DTArg* arg, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
@@ -61,7 +63,7 @@ struct AggSparse {
     static VTRes* apply(AggOpCode opCode,
                         const std::vector<bool>& aggregate_dimension,
                         const std::vector<std::vector<size_t>>& chunk_list,
-                        const DTArg* arg,
+                        DTArg* arg,
                         DCTX(ctx)) = delete;
 };
 
@@ -70,27 +72,17 @@ struct AggSparse {
 // ****************************************************************************
 
 template<typename VTRes, class DTArg>
-VTRes* agg(AggOpCode opCode, const std::vector<bool>& aggregate_dimension, const DTArg* arg, DCTX(ctx)) {
+VTRes* agg(AggOpCode opCode, const std::vector<bool>& aggregate_dimension, DTArg* arg, DCTX(ctx)) {
     return Agg<VTRes, DTArg>::apply(opCode, aggregate_dimension, arg, ctx);
 }
 
 template<typename VTRes, class DTArg>
 VTRes* agg(AggOpCode opCode,
            const std::vector<bool>& aggregate_dimension,
-           const std::vector<std::vector<size_t>>& chunk_list,
-           const DTArg* arg,
-           DCTX(ctx)) {
-    return AggSparse<VTRes, DTArg>::apply(opCode, aggregate_dimension, chunk_list, arg, ctx);
-}
-
-template<typename VTRes, class DTArg>
-VTRes* agg(AggOpCode opCode,
-           const std::vector<bool>& aggregate_dimension,
            const std::vector<std::pair<size_t, size_t>>& chunk_ranges,
-           const DTArg* arg,
+           DTArg* arg,
            DCTX(ctx)) {
-    return AggSparse<VTRes, DTArg>::apply(
-      opCode, aggregate_dimension, arg->GetChunkListFromIdRange(chunk_ranges), arg, ctx);
+    return AggSparse<VTRes, DTArg>::apply(opCode, aggregate_dimension, chunk_ranges, arg, ctx);
 }
 
 template<Scalar_t VTRes, Scalar_t VTArg>
@@ -130,7 +122,7 @@ struct Agg<ContiguousTensor<VTRes>, ContiguousTensor<VTArg>> {
 struct ChunkMap {
     size_t linear_src_id;
     size_t linear_dest_id;
-    bool not_proccessed_yet;
+    bool not_processed_yet;
 };
 
 std::vector<std::vector<std::vector<size_t>>> GetChunkAggregationLists(
@@ -170,7 +162,7 @@ template<Scalar_t VTRes, Scalar_t VTArg>
 struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
     static ChunkedTensor<VTRes>* apply(AggOpCode opCode,
                                        const std::vector<bool>& aggregate_dimension,
-                                       const ChunkedTensor<VTArg>* arg,
+                                       ChunkedTensor<VTArg>* arg,
                                        DCTX(ctx)) {
         size_t rank = arg->rank;
         if (aggregate_dimension.size() != rank) {
@@ -179,6 +171,7 @@ struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
 
         std::vector<size_t> result_tensor_shape = arg->tensor_shape;
         std::vector<size_t> result_chunk_shape  = arg->chunk_shape;
+        size_t chunk_count                      = arg->total_chunk_count;
 
         for (size_t i = 0; i < rank; i++) {
             if (aggregate_dimension[i]) {
@@ -195,20 +188,22 @@ struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
         if (AggOpCodeUtils::isPureBinaryReduction(opCode)) {    // Sum,Prod,min,max,idxmin,idxmax
             // TODO handle idxmin/max
 
-            auto chunk_status = std::make_unique<ChunkMap[]>(arg->total_chunk_count);
+            auto chunk_status = std::make_unique<ChunkMap[]>(chunk_count);
             std::vector<size_t> dest_chunk_ids;
             dest_chunk_ids.resize(rank);
-            for (size_t i = 0; i < arg->total_chunk_count; i++) {
+            for (size_t i = 0; i < chunk_count; i++) {
+                std::vector<size_t> tmp_src_ids = arg->getChunkIdsFromLinearChunkId(i);
+
                 for (size_t j = 0; j < rank; j++) {
-                    dest_chunk_ids[i] = aggregate_dimension[i] ? 1 : arg->getChunkIdsFromLinearChunkId(i)[j];
+                    dest_chunk_ids[j] = aggregate_dimension[j] ? 0 : tmp_src_ids[j];
                 }
                 chunk_status[i] = {i, result->getLinearChunkIdFromChunkIds(dest_chunk_ids), true};
             }
 
-            size_t remaining_chunks = arg->total_chunk_count;
+            size_t remaining_chunks = chunk_count;
             while (remaining_chunks != 0) {
-                for (size_t i = 0; i < chunk_status.size(); i++) {
-                    if (chunk_status[i].not_proccessed_yet) {
+                for (size_t i = 0; i < chunk_count; i++) {
+                    if (chunk_status[i].not_processed_yet) {
                         bool chunk_can_be_proccessed = false;
                         if (arg->chunk_materialization_flags[chunk_status[i].linear_src_id]) {
                             chunk_can_be_proccessed = true;
@@ -240,16 +235,16 @@ struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
                         }
 
                         if (chunk_can_be_proccessed) {
-                            bool is_first_op = dest_chunk_has_been_touched[chunk_status[i].linear_src_id];
+                            bool is_first_op = !dest_chunk_has_been_touched[chunk_status[i].linear_dest_id];
                             AggChunkOPDispatch(opCode,
-                                               result->getPtrToChunk(chunk_status[i].linear_src_id),
-                                               arg->getPtrToChunk(chunk_status[i].linear_dest_id),
+                                               result->getPtrToChunk(chunk_status[i].linear_dest_id),
+                                               arg->getPtrToChunk(chunk_status[i].linear_src_id),
                                                arg->chunk_shape,
                                                arg->chunk_element_count,
                                                aggregate_dimension,
                                                is_first_op);
-                            dest_chunk_has_been_touched[chunk_status[i].linear_src_id] = true;
-                            chunk_status[i].not_processed_yet                          = false;
+                            dest_chunk_has_been_touched[chunk_status[i].linear_dest_id] = true;
+                            chunk_status[i].not_processed_yet                           = false;
                             remaining_chunks--;
                         }
                     }
@@ -317,9 +312,8 @@ struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
                     }
                 }
             }
-
             if (no_aggregation_dim) {    // for correctness no need to be efficient
-                for (size_t i = 0; i < arg->total_chunk_count; i++) {
+                for (size_t i = 0; i < chunk_count; i++) {
                     while (!arg->IsChunkMaterialized(arg->getChunkIdsFromLinearChunkId(i))) {
                     };
                     VTRes* dest = result->getPtrToChunk(result->getChunkIdsFromLinearChunkId(i));
@@ -347,15 +341,36 @@ template<Scalar_t VTRes, Scalar_t VTArg>
 struct AggSparse<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
     static ChunkedTensor<VTRes>* apply(AggOpCode opCode,
                                        const std::vector<bool>& aggregate_dimension,
-                                       const std::vector<std::vector<size_t>>& chunk_list,
-                                       const ChunkedTensor<VTArg>* arg,
+                                       const std::vector<std::pair<size_t, size_t>>& chunk_ranges,
+                                       ChunkedTensor<VTArg>* arg,
                                        DCTX(ctx)) {
         size_t rank = arg->rank;
         if (aggregate_dimension.size() != rank) {
             throw std::runtime_error("Rank of tensor to reduce and size of aggregation map do not match!");
         }
-        std::vector<size_t> result_tensor_shape = arg->tensor_shape;
-        std::vector<size_t> result_chunk_shape  = arg->chunk_shape;
+
+        if (aggregate_dimension.size() != rank) {
+            throw std::runtime_error("Rank of tensor to reduce and size of aggregation map do not match!");
+        }
+        if (chunk_ranges.size() != rank) {
+            throw std::runtime_error("Rank of tensor to reduce and size of chunk ranges do not match!");
+        }
+        for (size_t i = 0; i < rank; i++) {
+            if ((std::get<0>(chunk_ranges[i]) >= std::get<1>(chunk_ranges[i])) ||
+                (std::get<0>(chunk_ranges[i]) >= arg->tensor_shape[i]) ||
+                (std::get<1>(chunk_ranges[i]) > arg->tensor_shape[i])) {
+                throw std::runtime_error(
+                  "Invalid chunk range! lhs must be larger than rhs and neither may be out >= tensor_shape[i]");
+            }
+        }
+
+        std::vector<std::vector<size_t>> chunk_list = arg->GetChunkListFromChunkRange(chunk_ranges).value();
+        std::vector<size_t> result_tensor_shape;
+        result_tensor_shape.resize(rank);
+        for (size_t i = 0; i < rank; i++) {
+            result_tensor_shape[i] = (std::get<1>(chunk_ranges[i]) - std::get<0>(chunk_ranges[i])) * arg->chunk_shape[i];
+        }
+        std::vector<size_t> result_chunk_shape = arg->chunk_shape;
 
         for (size_t i = 0; i < rank; i++) {
             if (aggregate_dimension[i]) {
@@ -366,7 +381,8 @@ struct AggSparse<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
 
         ChunkedTensor<VTRes>* result;
         if (opCode == AggOpCode::STDDEV) {
-            result = agg(AggOpCode::SUM, aggregate_dimension, arg, nullptr);
+            result = agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>>(
+              AggOpCode::SUM, aggregate_dimension, chunk_ranges, arg, nullptr);
         } else {
             result =
               DataObjectFactory::create<ChunkedTensor<VTRes>>(result_tensor_shape, result_chunk_shape, InitCode::NONE);
@@ -382,7 +398,7 @@ struct AggSparse<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
             dest_chunk_ids.resize(rank);
             for (size_t i = 0; i < chunk_list.size(); i++) {
                 for (size_t j = 0; j < rank; j++) {
-                    dest_chunk_ids[i] = aggregate_dimension[i] ? 1 : chunk_list[i][j];
+                    dest_chunk_ids[j] = aggregate_dimension[j] ? 0 : chunk_list[i][j] - std::get<0>(chunk_ranges[j]);
                 }
                 chunk_status[i] = {arg->getLinearChunkIdFromChunkIds(chunk_list[i]),
                                    result->getLinearChunkIdFromChunkIds(dest_chunk_ids),
@@ -392,7 +408,7 @@ struct AggSparse<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
             size_t remaining_chunks = chunk_list.size();
             while (remaining_chunks != 0) {
                 for (size_t i = 0; i < chunk_list.size(); i++) {
-                    if (chunk_status[i].not_proccessed_yet) {
+                    if (chunk_status[i].not_processed_yet) {
                         bool chunk_can_be_proccessed = false;
                         if (arg->chunk_materialization_flags[chunk_status[i].linear_src_id]) {
                             chunk_can_be_proccessed = true;
@@ -424,16 +440,16 @@ struct AggSparse<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
                         }
 
                         if (chunk_can_be_proccessed) {
-                            bool is_first_op = dest_chunk_has_been_touched[chunk_status[i].linear_src_id];
+                            bool is_first_op = !dest_chunk_has_been_touched[chunk_status[i].linear_dest_id];
                             AggChunkOPDispatch(opCode,
-                                               result->getPtrToChunk(chunk_status[i].linear_src_id),
-                                               arg->getPtrToChunk(chunk_status[i].linear_dest_id),
+                                               result->getPtrToChunk(chunk_status[i].linear_dest_id),
+                                               arg->getPtrToChunk(chunk_status[i].linear_src_id),
                                                arg->chunk_shape,
                                                arg->chunk_element_count,
                                                aggregate_dimension,
                                                is_first_op);
-                            dest_chunk_has_been_touched[chunk_status[i].linear_src_id] = true;
-                            chunk_status[i].not_proccessed_yet                         = false;
+                            dest_chunk_has_been_touched[chunk_status[i].linear_dest_id] = true;
+                            chunk_status[i].not_processed_yet                           = false;
                             remaining_chunks--;
                         }
                     }
@@ -761,7 +777,7 @@ void AggChunk(VTRes* dest,
             dest_chunk_strides[0] = 1;
             for (size_t j = 1; j < rank; j++) {
                 src_chunk_strides[j] = src_chunk_strides[j - 1] * chunk_shape[j - 1];
-                if ((j-1) == i) {
+                if ((j - 1) == i) {
                     dest_chunk_strides[j] = dest_chunk_strides[j - 1];
                 } else {
                     dest_chunk_strides[j] = dest_chunk_strides[j - 1] * chunk_shape[j - 1];
