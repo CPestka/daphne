@@ -88,11 +88,21 @@ class ContiguousTensor : public Tensor<ValueType> {
             }
         }
     };
+    
+    template<typename VTArg>
+    ContiguousTensor(const ContiguousTensor<VTArg> *other)
+        : Tensor<ValueType>::Tensor(other->tensor_shape), strides(other->strides) {
+         data = std::make_shared<ValueType[]>(this->total_element_count);
+         for(size_t i=0; i<this->total_element_count; i++) {
+            data[i] = static_cast<ValueType>(other->data[i]);
+         }
+    };
 
-    ContiguousTensor(ContiguousTensor<ValueType> *other)
+    template<>
+    ContiguousTensor(const ContiguousTensor<ValueType> *other)
         : Tensor<ValueType>::Tensor(other->tensor_shape), strides(other->strides), data(other->data) {};
 
-    ContiguousTensor(DenseMatrix<ValueType> *other)
+    ContiguousTensor(const DenseMatrix<ValueType> *other)
         : Tensor<ValueType>::Tensor(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
         strides = {1, other->getNumCols()};
         for(size_t i=0; i<this->rank; i++) {
@@ -122,6 +132,25 @@ class ContiguousTensor : public Tensor<ValueType> {
         }
 
         std::memcpy(data.get(), input_data, this->total_element_count * sizeof(ValueType));
+    }
+
+    ContiguousTensor(std::shared_ptr<ValueType[]>& input_data, const std::vector<size_t> &tensor_shape)
+        : Tensor<ValueType>::Tensor(tensor_shape) {
+        data = input_data;
+        strides.resize(this->rank);
+        if (this->rank > 0) {
+            strides[0] = 1;
+        }
+
+        for(size_t i=0; i<this->rank; i++) {
+            if (this->tensor_shape[i] == 0) {
+                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+            }
+        }
+
+        for (size_t i = 1; i < this->rank; i++) {
+            strides[i] = strides[i - 1] * this->tensor_shape[i - 1];
+        }
     }
 
     // Takes ownership of data

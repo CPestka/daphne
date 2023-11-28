@@ -24,6 +24,7 @@
 #include <runtime/local/kernels/AggOpCode.h>
 #include <runtime/local/kernels/EwBinarySca.h>
 
+#include <cmath>
 #include <stdexcept>
 #include <vector>
 #include <cstddef>
@@ -35,12 +36,12 @@
 
 #include "AggOpCode.h"
 
-// TODO: IDXmin/max, handle stddev and mean for contiguous tensor
+// TODO: IDXmin/max
 
 // The arg are not const here since the kernels check and update the materilization flags / io status of chunks
 // The alternative way of doing this would be to add callbacks that do that to the io engine so th compute kernels do
 // not have to modify the arg tensor
-// TODO handle overhanging chunks properly
+// TODO: handle overhanging chunks properly
 
 template<typename T>
 concept Scalar_t = std::is_arithmetic<T>::value;
@@ -107,13 +108,13 @@ struct Agg<ContiguousTensor<VTRes>, ContiguousTensor<VTArg>> {
         ContiguousTensor<VTRes>* result =
           DataObjectFactory::create<ContiguousTensor<VTRes>>(result_tensor_shape, InitCode::NONE);
 
-        AggChunkOPDispatch(opCode,
-                           result->data.get(),
-                           arg->data.get(),
-                           arg->tensor_shape,
-                           arg->total_element_count,
-                           aggregate_dimension,
-                           true);
+        AggChunkOPDispatch<VTRes, VTArg, true>(opCode,
+                                               result->data.get(),
+                                               arg->data.get(),
+                                               arg->tensor_shape,
+                                               arg->total_element_count,
+                                               aggregate_dimension,
+                                               true);
 
         return result;
     }
@@ -186,8 +187,6 @@ struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
         std::vector<bool> dest_chunk_has_been_touched(result->total_chunk_count, false);
 
         if (AggOpCodeUtils::isPureBinaryReduction(opCode)) {    // Sum,Prod,min,max,idxmin,idxmax
-            // TODO handle idxmin/max
-
             auto chunk_status = std::make_unique<ChunkMap[]>(chunk_count);
             std::vector<size_t> dest_chunk_ids;
             dest_chunk_ids.resize(rank);
@@ -236,13 +235,14 @@ struct Agg<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
 
                         if (chunk_can_be_proccessed) {
                             bool is_first_op = !dest_chunk_has_been_touched[chunk_status[i].linear_dest_id];
-                            AggChunkOPDispatch(opCode,
-                                               result->getPtrToChunk(chunk_status[i].linear_dest_id),
-                                               arg->getPtrToChunk(chunk_status[i].linear_src_id),
-                                               arg->chunk_shape,
-                                               arg->chunk_element_count,
-                                               aggregate_dimension,
-                                               is_first_op);
+                            AggChunkOPDispatch<VTRes, VTArg, false>(
+                              opCode,
+                              result->getPtrToChunk(chunk_status[i].linear_dest_id),
+                              arg->getPtrToChunk(chunk_status[i].linear_src_id),
+                              arg->chunk_shape,
+                              arg->chunk_element_count,
+                              aggregate_dimension,
+                              is_first_op);
                             dest_chunk_has_been_touched[chunk_status[i].linear_dest_id] = true;
                             chunk_status[i].not_processed_yet                           = false;
                             remaining_chunks--;
@@ -368,7 +368,8 @@ struct AggSparse<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
         std::vector<size_t> result_tensor_shape;
         result_tensor_shape.resize(rank);
         for (size_t i = 0; i < rank; i++) {
-            result_tensor_shape[i] = (std::get<1>(chunk_ranges[i]) - std::get<0>(chunk_ranges[i])) * arg->chunk_shape[i];
+            result_tensor_shape[i] =
+              (std::get<1>(chunk_ranges[i]) - std::get<0>(chunk_ranges[i])) * arg->chunk_shape[i];
         }
         std::vector<size_t> result_chunk_shape = arg->chunk_shape;
 
@@ -441,13 +442,14 @@ struct AggSparse<ChunkedTensor<VTRes>, ChunkedTensor<VTArg>> {
 
                         if (chunk_can_be_proccessed) {
                             bool is_first_op = !dest_chunk_has_been_touched[chunk_status[i].linear_dest_id];
-                            AggChunkOPDispatch(opCode,
-                                               result->getPtrToChunk(chunk_status[i].linear_dest_id),
-                                               arg->getPtrToChunk(chunk_status[i].linear_src_id),
-                                               arg->chunk_shape,
-                                               arg->chunk_element_count,
-                                               aggregate_dimension,
-                                               is_first_op);
+                            AggChunkOPDispatch<VTRes, VTArg, false>(
+                              opCode,
+                              result->getPtrToChunk(chunk_status[i].linear_dest_id),
+                              arg->getPtrToChunk(chunk_status[i].linear_src_id),
+                              arg->chunk_shape,
+                              arg->chunk_element_count,
+                              aggregate_dimension,
+                              is_first_op);
                             dest_chunk_has_been_touched[chunk_status[i].linear_dest_id] = true;
                             chunk_status[i].not_processed_yet                           = false;
                             remaining_chunks--;
@@ -684,7 +686,7 @@ bool IsFirstEntryInAggDim(size_t linear_id, const std::vector<size_t>& strides, 
     return false;
 }
 
-template<Scalar_t VTRes, Scalar_t VTArg, AggOpCode opCode>
+template<Scalar_t VTRes, Scalar_t VTArg, AggOpCode opCode, bool is_only_chunk>
 void AggChunkSingleDim(VTRes* dest,
                        VTArg* src,
                        const std::vector<size_t>& chunk_shape,
@@ -694,6 +696,11 @@ void AggChunkSingleDim(VTRes* dest,
                        size_t aggregate_dimension) {
     size_t dest_chunk_size = chunk_size / chunk_shape[aggregate_dimension];
     size_t rank            = chunk_shape.size();
+
+    if constexpr (is_only_chunk && (opCode == AggOpCode::STDDEV)) {
+        AggChunkSingleDim<VTRes, VTArg, AggOpCode::SUM, true>(
+          dest, src, chunk_shape, src_chunk_strides, dest_chunk_strides, chunk_size, aggregate_dimension);
+    }
 
     for (size_t i = 0; i < dest_chunk_size; i++) {
         std::vector<size_t> ids;
@@ -709,28 +716,51 @@ void AggChunkSingleDim(VTRes* dest,
             zero_element_in_agg_dim_linear_id += (ids[j] * src_chunk_strides[j]);
         }
 
-        dest[i] = static_cast<VTRes>(src[zero_element_in_agg_dim_linear_id]);
+        if constexpr (opCode == AggOpCode::STDDEV && is_only_chunk) {
+            dest[i]    = dest[i] / chunk_shape[aggregate_dimension];    // now contains the average
+            size_t tmp = 0;
+            for (size_t j = 0; j < chunk_shape[aggregate_dimension]; j++) {
+                size_t current_offset =
+                  zero_element_in_agg_dim_linear_id + (j * src_chunk_strides[aggregate_dimension]);
+                size_t tmp2 = static_cast<VTRes>(src[current_offset] - dest[i]);
+                tmp += (tmp2 * tmp2);
+            }
+            tmp     = tmp / (chunk_shape[aggregate_dimension] - 1);
+            dest[i] = std::sqrt(tmp);
+        } else if constexpr (opCode == AggOpCode::MEAN && is_only_chunk) {
+            std::vector<VTRes> values;
+            values.resize(chunk_shape[aggregate_dimension]);
+            for (size_t j = 0; j < chunk_shape[aggregate_dimension]; j++) {
+                size_t current_offset =
+                  zero_element_in_agg_dim_linear_id + (j * src_chunk_strides[aggregate_dimension]);
+                values[j] = static_cast<VTRes>(src[current_offset]);
+            }
+            std::sort(values.begin(), values.end());
+            dest[i] = values[chunk_shape[aggregate_dimension] / 2];
+        } else {
+            dest[i] = static_cast<VTRes>(src[zero_element_in_agg_dim_linear_id]);
 
-        for (size_t j = 1; j < chunk_shape[aggregate_dimension]; j++) {
-            size_t current_offset = zero_element_in_agg_dim_linear_id + (j * src_chunk_strides[aggregate_dimension]);
+            for (size_t j = 1; j < chunk_shape[aggregate_dimension]; j++) {
+                size_t current_offset =
+                  zero_element_in_agg_dim_linear_id + (j * src_chunk_strides[aggregate_dimension]);
 
-            if constexpr (opCode == AggOpCode::SUM) {
-                dest[i] += static_cast<VTRes>(src[current_offset]);
-            } else if constexpr (opCode == AggOpCode::PROD) {
-                dest[i] *= static_cast<VTRes>(src[current_offset]);
-            } else if constexpr (opCode == AggOpCode::MIN) {
-                dest[i] = std::min(dest[i], static_cast<VTRes>(src[current_offset]));
-            } else if constexpr (opCode == AggOpCode::MAX) {
-                dest[i] = std::max(dest[i], static_cast<VTRes>(src[current_offset]));
-            } else {
-                throw std::runtime_error("unsupported op_code reached");
-                // Todo handle idxmin/max and mean stddev further up
+                if constexpr (opCode == AggOpCode::SUM) {
+                    dest[i] += static_cast<VTRes>(src[current_offset]);
+                } else if constexpr (opCode == AggOpCode::PROD) {
+                    dest[i] *= static_cast<VTRes>(src[current_offset]);
+                } else if constexpr (opCode == AggOpCode::MIN) {
+                    dest[i] = std::min(dest[i], static_cast<VTRes>(src[current_offset]));
+                } else if constexpr (opCode == AggOpCode::MAX) {
+                    dest[i] = std::max(dest[i], static_cast<VTRes>(src[current_offset]));
+                } else {
+                    throw std::runtime_error("unsupported op_code reached");
+                }
             }
         }
     }
 }
 
-template<Scalar_t VTRes, Scalar_t VTArg, AggOpCode opCode>
+template<Scalar_t VTRes, Scalar_t VTArg, AggOpCode opCode, bool is_only_chunk>
 void AggChunk(VTRes* dest,
               VTArg* src,
               std::vector<size_t> chunk_shape,    // intentionally per value
@@ -785,12 +815,12 @@ void AggChunk(VTRes* dest,
             }
 
             if (is_first_swap) {
-                AggChunkSingleDim<VTRes, VTArg, opCode>(
+                AggChunkSingleDim<VTRes, VTArg, opCode, is_only_chunk>(
                   current_dest, src, chunk_shape, src_chunk_strides, dest_chunk_strides, current_chunk_size, i);
                 current_src  = current_dest;
                 current_dest = &(scratch_space[chunk_size]);
             } else {
-                AggChunkSingleDim<VTRes, VTRes, opCode>(
+                AggChunkSingleDim<VTRes, VTRes, opCode, is_only_chunk>(
                   current_dest, current_src, chunk_shape, src_chunk_strides, dest_chunk_strides, current_chunk_size, i);
                 std::swap(current_src, current_dest);
             }
@@ -833,7 +863,7 @@ void AggChunk(VTRes* dest,
     }
 }
 
-template<Scalar_t VTRes, Scalar_t VTArg>
+template<Scalar_t VTRes, Scalar_t VTArg, bool is_only_chunk>
 void AggChunkOPDispatch(AggOpCode opCode,
                         VTRes* dest,
                         VTArg* src,
@@ -844,19 +874,19 @@ void AggChunkOPDispatch(AggOpCode opCode,
     switch (opCode) {
         using enum AggOpCode;
         case MIN:
-            AggChunk<VTRes, VTArg, AggOpCode::MIN>(
+            AggChunk<VTRes, VTArg, AggOpCode::MIN, is_only_chunk>(
               dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
             break;
         case MAX:
-            AggChunk<VTRes, VTArg, AggOpCode::MAX>(
+            AggChunk<VTRes, VTArg, AggOpCode::MAX, is_only_chunk>(
               dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
             break;
         case SUM:
-            AggChunk<VTRes, VTArg, AggOpCode::SUM>(
+            AggChunk<VTRes, VTArg, AggOpCode::SUM, is_only_chunk>(
               dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
             break;
         case PROD:
-            AggChunk<VTRes, VTArg, AggOpCode::PROD>(
+            AggChunk<VTRes, VTArg, AggOpCode::PROD, is_only_chunk>(
               dest, src, chunk_shape, chunk_size, aggregation_dimension, is_initial_chunk_in_dest_location);
             break;
         default:
