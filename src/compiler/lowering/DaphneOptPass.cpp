@@ -21,6 +21,7 @@ using namespace mlir;
 
 class IntegerModOpt : public mlir::OpConversionPattern<mlir::daphne::EwModOp> {
    public:
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(IntegerModOpt)
     using OpConversionPattern::OpConversionPattern;
 
     [[nodiscard]] static bool optimization_viable(mlir::daphne::EwModOp op) {
@@ -55,6 +56,7 @@ namespace {
 struct DenseMatrixOptPass
     : public mlir::PassWrapper<DenseMatrixOptPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DenseMatrixOptPass)
     explicit DenseMatrixOptPass() {}
 
     void getDependentDialects(mlir::DialectRegistry &registry) const override {

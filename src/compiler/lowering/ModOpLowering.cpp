@@ -35,6 +35,7 @@ using namespace mlir;
 class EwModOpLowering
     : public mlir::OpConversionPattern<mlir::daphne::EwModOp> {
    public:
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(EwModOpLowering)
     using OpConversionPattern::OpConversionPattern;
 
     [[nodiscard]] bool optimization_viable(mlir::Value divisor) const {

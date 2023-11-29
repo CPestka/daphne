@@ -118,6 +118,7 @@ void affineMatMul(mlir::Value &lhs, mlir::Value &rhs, mlir::Value &output,
 
 class MatMulLowering : public OpConversionPattern<daphne::MatMulOp> {
    public:
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MatMulLowering)
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(

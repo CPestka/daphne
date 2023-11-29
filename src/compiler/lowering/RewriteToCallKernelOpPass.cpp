@@ -486,6 +486,7 @@ namespace
     struct RewriteToCallKernelOpPass
     : public PassWrapper<RewriteToCallKernelOpPass, OperationPass<func::FuncOp>>
     {
+        MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(RewriteToCallKernelOpPass)
         RewriteToCallKernelOpPass() = default;
         void runOnOperation() final;
     };

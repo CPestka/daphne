@@ -23,6 +23,7 @@
 using namespace mlir;
 
 struct MarkFPGAOPENCLOpsPass : public PassWrapper<MarkFPGAOPENCLOpsPass, OperationPass<func::FuncOp>> {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MarkFPGAOPENCLOpsPass)
 
     /**
      * @brief User configuration influencing the rewrite pass

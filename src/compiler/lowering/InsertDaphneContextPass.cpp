@@ -34,6 +34,7 @@ using namespace mlir;
 // - passing the context as an argument to a function
 struct InsertDaphneContextPass : public PassWrapper<InsertDaphneContextPass, OperationPass<func::FuncOp>>
 {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(InsertDaphneContextPass)
     const DaphneUserConfig& user_config;
     explicit InsertDaphneContextPass(const DaphneUserConfig& cfg) : user_config(cfg) {}
     void runOnOperation() final;

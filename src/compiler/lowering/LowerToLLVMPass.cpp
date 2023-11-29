@@ -896,6 +896,7 @@ namespace
     struct DaphneLowerToLLVMPass
     : public PassWrapper<DaphneLowerToLLVMPass, OperationPass<ModuleOp>>
     {
+        MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DaphneLowerToLLVMPass)
 		explicit DaphneLowerToLLVMPass(const DaphneUserConfig& cfg) : cfg(cfg) { }
 		const DaphneUserConfig& cfg;
 

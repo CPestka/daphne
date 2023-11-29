@@ -47,6 +47,7 @@ using namespace mlir;
  */
 struct ManageObjRefsPass : public PassWrapper<ManageObjRefsPass, OperationPass<func::FuncOp>>
 {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ManageObjRefsPass)
     explicit ManageObjRefsPass() {}
     void runOnOperation() final;
 

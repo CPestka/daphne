@@ -250,6 +250,7 @@ namespace {
 struct EwOpLoweringPass
     : public mlir::PassWrapper<EwOpLoweringPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(EwOpLoweringPass)
     explicit EwOpLoweringPass() {}
 
     void getDependentDialects(mlir::DialectRegistry &registry) const override {

@@ -24,6 +24,7 @@
 using namespace mlir;
 
 struct MarkCUDAOpsPass : public PassWrapper<MarkCUDAOpsPass, OperationPass<func::FuncOp>> {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MarkCUDAOpsPass)
     
     /**
      * @brief User configuration influencing the rewrite pass

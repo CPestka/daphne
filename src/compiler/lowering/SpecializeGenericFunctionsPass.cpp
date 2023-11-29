@@ -56,7 +56,7 @@ namespace {
     /**
      * @brief Checks if the function is a template, by checking the types of input arguments.
      * 
-     * We consider a function a template iff:
+     * We consider a function a template if:
      * (1) it is an untyped function (i.e., at least one of the inputs is of unknown type
      *     or a matrix of unknown value type), or
      * (2) at least one of the inputs is a matrix with unknown properties
@@ -183,7 +183,7 @@ namespace {
     }
 
     class SpecializeGenericFunctionsPass
-        : public PassWrapper<SpecializeGenericFunctionsPass, OperationPass<ModuleOp>> {
+        : public PassWrapper<SpecializeGenericFunctionsPass, OperationPass<ModuleOp>> {        
         std::unordered_map<std::string, func::FuncOp> functions;
         std::multimap<std::string, func::FuncOp> specializedVersions;
         std::set<func::FuncOp> visited;
@@ -194,6 +194,8 @@ namespace {
         std::shared_ptr<spdlog::logger> logger;
 
     public:
+        MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(SpecializeGenericFunctionsPass)
+        
         explicit SpecializeGenericFunctionsPass(const DaphneUserConfig& cfg) : userConfig(cfg) {
             logger = spdlog::get("compiler");
         }

@@ -35,6 +35,7 @@ using namespace mlir;
  */
 struct WhileLoopInvariantCodeMotionPass
 : public PassWrapper <WhileLoopInvariantCodeMotionPass, OperationPass<func::FuncOp>> {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(WhileLoopInvariantCodeMotionPass)
     void runOnOperation() final;
 
     StringRef getArgument() const final { return "while-loop-invariant-code-motion"; }

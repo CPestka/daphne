@@ -69,6 +69,7 @@ public:
 namespace {
     struct PhyOperatorSelectionPass
     : public PassWrapper<PhyOperatorSelectionPass, OperationPass<ModuleOp>> {
+        MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PhyOperatorSelectionPass)
 		explicit PhyOperatorSelectionPass() { }
         void runOnOperation() final;
     };

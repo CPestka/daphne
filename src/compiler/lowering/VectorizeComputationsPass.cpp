@@ -172,6 +172,7 @@ namespace
     }
 
     struct VectorizeComputationsPass : public PassWrapper<VectorizeComputationsPass, OperationPass<func::FuncOp>> {
+        MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(VectorizeComputationsPass)
         void runOnOperation() final;
     };
 }

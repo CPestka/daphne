@@ -28,6 +28,7 @@ using namespace mlir;
  */
 struct ProfilingPass: public PassWrapper<ProfilingPass, OperationPass<func::FuncOp>>
 {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ProfilingPass)
     explicit ProfilingPass() {}
     void runOnOperation() final;
 };

@@ -66,6 +66,7 @@ struct DistributePipelines : public OpConversionPattern<daphne::VectorizedPipeli
 struct DistributePipelinesPass
     : public PassWrapper<DistributePipelinesPass, OperationPass<ModuleOp>>
 {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DistributePipelinesPass)
     void runOnOperation() final;
 
     StringRef getArgument() const final { return "distribute-pipelines"; }

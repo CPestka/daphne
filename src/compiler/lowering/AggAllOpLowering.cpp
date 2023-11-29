@@ -55,6 +55,8 @@ using namespace mlir;
 
 class SumAllOpLowering : public OpConversionPattern<daphne::AllAggSumOp> {
    public:
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(SumAllOpLowering)
+
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(

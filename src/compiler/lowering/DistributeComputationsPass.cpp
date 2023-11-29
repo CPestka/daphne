@@ -72,6 +72,7 @@ struct Distribute : public OpInterfaceConversionPattern<daphne::Distributable>
 struct DistributeComputationsPass
     : public PassWrapper<DistributeComputationsPass, OperationPass<ModuleOp>>
 {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DistributeComputationsPass)
     void runOnOperation() final;
 
     StringRef getArgument() const final { return "distribute-computation"; }
