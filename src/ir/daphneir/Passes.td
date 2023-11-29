@@ -75,5 +75,8 @@ def LowerEwOpPass: Pass<"lower-ew", "::mlir::func::FuncOp"> {
     let constructor = "mlir::daphne::createEwOpLoweringPass()";
 }
 
+def PartialReadPass: Pass<"lower-partialread", "::mlir::func::FuncOp"> {
+    let constructor = "mlir::daphne::createPartialReadPass()";
+}
 
 #endif // SRC_IR_DAPHNEIR_PASSES_TD

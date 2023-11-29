@@ -1361,6 +1361,14 @@ def Daphne_ReadOp : Daphne_Op<"read", [
     let results = (outs MatrixOrFrameOrTensor:$res);
 }
 
+def Daphne_PartialReadOp : Daphne_Op<"partialReadZarr", [
+    DeclareOpInterfaceMethods<InferTypesOpInterface>,
+    DeclareOpInterfaceMethods<InferShapeOpInterface>
+]> {
+    let arguments = (ins StrScalar:$fileName, UI32:$lowerX, UI32:$upperX, UI32:$lowerY, UI32:$upperY, UI32:$lowerZ, UI32:$upperZ);
+    let results = (outs MatrixOrFrameOrTensor:$res);
+}
+
 def Daphne_WriteOp : Daphne_Op<"write"> {
     let arguments = (ins MatrixOrFrame:$arg, StrScalar:$fileName);
     let results = (outs); // no results

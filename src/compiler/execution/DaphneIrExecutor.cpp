@@ -205,6 +205,8 @@ bool DaphneIrExecutor::runPasses(mlir::ModuleOp module) {
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(mlir::createCSEPass());
 
+    pm.addPass(mlir::daphne::createPartialReadPass());
+
     if (userConfig_.use_obj_ref_mgnt)
         pm.addNestedPass<mlir::func::FuncOp>(
             mlir::daphne::createManageObjRefsPass());

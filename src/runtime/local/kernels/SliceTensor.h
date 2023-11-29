@@ -46,11 +46,6 @@ void sliceTensor(DTRes *& res, const DTArg * arg, size_t lowerInclX, size_t uppe
     SliceTensor<DTRes, DTArg>::apply(res, arg, lowerInclX, upperExclX, lowerInclY, upperExclY, lowerInclZ, upperExclZ, ctx);
 }
 
-template<class DTRes, class DTArg>
-void sliceTensor1(DTRes *& res, const DTArg * arg, size_t lowerInclX, DCTX(ctx)) {
-    //SliceTensor<DTRes, DTArg>::apply(res, arg, lowerInclX, upperExclX, lowerInclY, upperExclY, lowerInclZ, upperExclZ, ctx);
-}
-
 // ****************************************************************************
 // (Partial) template specializations for different data/value types
 // ****************************************************************************
@@ -75,7 +70,7 @@ template<typename VT>
 struct SliceTensor<ChunkedTensor<VT>, ChunkedTensor<VT>> {
     static void apply(ChunkedTensor<VT> *& res, const ChunkedTensor<VT> * arg, size_t lowerInclX, size_t upperExclX, size_t lowerInclY, size_t upperExclY, size_t lowerInclZ, size_t upperExclZ, DCTX(ctx)) {
         std::vector<std::pair<size_t, size_t>> index_ranges {{lowerInclX, upperExclX}, {lowerInclY, upperExclY}, {lowerInclZ, upperExclZ}};
-        res = arg->tryDice(index_ranges);
+        //res = arg->tryDice(index_ranges);
     }
 };
 

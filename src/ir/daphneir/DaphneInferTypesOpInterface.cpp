@@ -381,6 +381,31 @@ std::vector<Type> daphne::ReadOp::inferTypes() {
     return {daphne::UnknownType::get(getContext())};
 }
 
+std::vector<Type> daphne::PartialReadOp::inferTypes() {
+    auto p = CompilerUtils::isConstant<std::string>(getFileName());
+    Builder builder(getContext());
+    if (auto resType = getRes().getType().dyn_cast<daphne::TensorType>()) {
+        if (p.first) {
+            FileMetaData fmd = CompilerUtils::getFileMetaData(getFileName());
+            if (fmd.external) {
+                auto fmd = ZarrFileMetaDataParser::readMetaData(CompilerUtils::constantOrThrow<std::string>(getFileName()));
+                mlir::Type valType = mlirTypeForCode(fmd.data_type, builder);
+                if (fmd.shape == fmd.chunks) {
+                    return {mlir::daphne::TensorType::get(getContext(), valType).withRepresentation(TensorRepresentation::Contiguous)};
+                } else {
+                    return {mlir::daphne::TensorType::get(getContext(), valType).withRepresentation(TensorRepresentation::Chunked)};
+                }
+            } else {
+                mlir::Type valType = mlirTypeForCode(fmd.schema[0], builder);
+                return {mlir::daphne::TensorType::get(getContext(), valType)};
+            }
+        } else {
+            return {mlir::daphne::TensorType::get(getContext(), daphne::UnknownType::get(getContext()))};
+        }
+    }
+    return {daphne::UnknownType::get(getContext())};
+}
+
 std::vector<Type> daphne::SliceColOp::inferTypes() {
     Type u     = daphne::UnknownType::get(getContext());
     Type srcTy = getSource().getType();

@@ -2425,6 +2425,73 @@
     },
     {
         "kernelTemplate": {
+            "header": "../io/ReadZarr.h",
+            "opName": "partialReadZarr",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "DTRes *&",
+                    "name": "res"
+                },
+                {
+                    "type": "const char *",
+                    "name": "filename"
+                },
+                {
+                    "type": "uint32_t",
+                    "name": "lowerX"
+                },
+                {
+                    "type": "uint32_t",
+                    "name": "upperX"
+                },
+                {
+                    "type": "uint32_t",
+                    "name": "lowerY"
+                },
+                {
+                    "type": "uint32_t",
+                    "name": "upperY"
+                },
+                {
+                    "type": "uint32_t",
+                    "name": "lowerZ"
+                },
+                {
+                    "type": "uint32_t",
+                    "name": "upperZ"
+                }
+            ]
+        },
+        "instantiations": [
+            [["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "int8_t"]],
+            [["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "size_t"]],
+            [["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "int8_t"]],
+            [["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "size_t"]]
+        ]
+    },
+    {
+        "kernelTemplate": {
             "header": "GetColIdx.h",
             "opName": "getColIdx",
             "returnType": "size_t",
@@ -2884,9 +2951,7 @@
                 }
             ]
         },
-        "instantiations": [
-            []
-        ]
+        "instantiations": []
     },
     {
         "kernelTemplate": {
@@ -3308,49 +3373,16 @@
             [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "uint64_t"]],
             [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "uint32_t"]],
             [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "uint8_t"]],
-            [["ContiguousTensor", "size_t"], ["ContiguousTensor", "size_t"]]
-        ]
-    },
-    {
-        "kernelTemplate": {
-            "header": "SliceTensor.h",
-            "opName": "sliceTensor1",
-            "returnType": "void",
-            "templateParams": [
-                {
-                    "name": "DTRes",
-                    "isDataType": true
-                },
-                {
-                    "name": "DTArg",
-                    "isDataType": true
-                }
-            ],
-            "runtimeParams": [
-                {
-                    "type": "DTRes *&",
-                    "name": "res"
-                },
-                {
-                    "type": "const DTArg *",
-                    "name": "arg"
-                },
-                {
-                    "type": "size_t",
-                    "name": "lowerInclX"
-                }
-            ]
-        },
-        "instantiations": [
-            [["ContiguousTensor", "double"], ["ContiguousTensor", "double"]],
-            [["ContiguousTensor", "float"], ["ContiguousTensor", "float"]],
-            [["ContiguousTensor", "int64_t"],["ContiguousTensor", "int64_t"] ],
-            [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "int32_t"]],
-            [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "int8_t"]],
-            [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "uint64_t"]],
-            [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "uint32_t"]],
-            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "uint8_t"]],
-            [["ContiguousTensor", "size_t"], ["ContiguousTensor", "size_t"]]
+            [["ContiguousTensor", "size_t"], ["ContiguousTensor", "size_t"]],
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "float"], ["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "int64_t"],["ChunkedTensor", "int64_t"] ],
+            [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "int8_t"]],
+            [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "size_t"], ["ChunkedTensor", "size_t"]]
         ]
     },
     {

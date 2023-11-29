@@ -63,6 +63,7 @@ namespace mlir::daphne {
     std::unique_ptr<Pass> createSpecializeGenericFunctionsPass(const DaphneUserConfig& cfg);
     std::unique_ptr<Pass> createVectorizeComputationsPass();
     std::unique_ptr<Pass> createWhileLoopInvariantCodeMotionPass();
+    std::unique_ptr<Pass> createPartialReadPass();
 #ifdef USE_CUDA
     std::unique_ptr<Pass> createMarkCUDAOpsPass(const DaphneUserConfig& cfg);
 #endif

@@ -238,6 +238,29 @@ std::vector<std::vector<ssize_t>> daphne::ReadOp::inferShape() {
     return {};
 }
 
+std::vector<std::vector<ssize_t>> daphne::PartialReadOp::inferShape() {
+    auto p = CompilerUtils::isConstant<std::string>(getFileName());
+    Type t = getRes().getType();
+    if (t.dyn_cast<daphne::TensorType>()) {
+        if (p.first) {
+            FileMetaData fmd = CompilerUtils::getFileMetaData(getFileName());
+            if (fmd.external) {
+                auto zfmd = ZarrFileMetaDataParser::readMetaData(p.second);
+                // size_t vs. ssize_t madness
+                return {std::vector<ssize_t>(zfmd.shape.begin(), zfmd.shape.end())};
+            } else {
+                // todo: if not external, should we instead throw an error?
+                return {{static_cast<ssize_t>(fmd.numRows), static_cast<ssize_t>(fmd.numCols), static_cast<ssize_t>(fmd.numCols)}};
+            }
+        } else {
+            return {{-1, -1, -1}};
+        }
+    }
+
+    throw std::runtime_error("Supposedly unreachable");
+    return {};
+}
+
 std::vector<std::vector<ssize_t>> daphne::OrderOp::inferShape() {
     ssize_t numRows = -1;
     ssize_t numCols = -1;
