@@ -1139,7 +1139,7 @@ class ChunkedTensor : public Tensor<ValueType> {
             if (IsValueMaterialized(current_ids)) {
                 os << get(current_ids) << " ";
             } else {
-                os << "Not_Materialized ";
+                os << "_ ";
             }
         }
         os << std::endl;

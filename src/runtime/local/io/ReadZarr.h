@@ -48,9 +48,7 @@ struct ReadZarr {
 
 template<class DTRes>
 struct PartialReadZarr {
-    static void apply(DTRes *&res,
-                      const char *filename,
-                      const std::vector<std::pair<size_t, size_t>> &element_id_ranges) = delete;
+    static void apply(DTRes *&res, const char *filename, const std::vector<std::pair<size_t, size_t>> &element_id_ranges) = delete;
 };
 
 // ****************************************************************************
@@ -72,6 +70,11 @@ void readZarr(DTRes *&res,
               const std::vector<std::pair<size_t, size_t>> &element_id_ranges,
               IOThreadpool *io_uring_pool) {
     PartialReadZarr<DTRes>::apply(res, filename, element_id_ranges, io_uring_pool);
+}
+
+template<class DTRes>
+void partialReadZarr(DTRes *&res, const char *filename, uint32_t lowerX, uint32_t upperX, uint32_t lowerY, uint32_t upperY, uint32_t lowerZ, uint32_t upperZ, DCTX(ctx)) {
+    PartialReadZarr<DTRes>::apply(res, filename, {{lowerX, upperX},{lowerY,upperY},{lowerZ,upperZ}});
 }
 
 template<typename VT>
@@ -317,6 +320,14 @@ struct ReadZarr<ChunkedTensor<VT>> {
 };
 
 // As in the tensor classes themselves the ranges are inclusive on both sides
+
+template<typename VT>
+struct PartialReadZarr<ContiguousTensor<VT>> {
+    static void apply(ContiguousTensor<VT> *&res,
+                      const char *filename,
+                      const std::vector<std::pair<size_t, size_t>> &element_id_ranges) {}
+};
+
 template<typename VT>
 struct PartialReadZarr<ChunkedTensor<VT>> {
     static void apply(ChunkedTensor<VT> *&res,

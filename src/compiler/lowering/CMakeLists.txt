@@ -33,6 +33,8 @@ add_mlir_dialect_library(MLIRDaphneTransforms
     MapOpLowering.cpp
     MatMulOpLowering.cpp
     AggAllOpLowering.cpp
+    #PartialReadPass.cpp
+    PartialReadPass1.cpp
 
     DEPENDS
     MLIRDaphneOpsIncGen

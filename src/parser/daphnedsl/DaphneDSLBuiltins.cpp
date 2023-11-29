@@ -1043,6 +1043,18 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
         return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0]));
     }
 
+    if (func == "readPartialTensor") {
+        checkNumArgsExact(func, numArgs, 7);
+        mlir::Type resType = mlir::daphne::TensorType::get(builder.getContext(), {utils.unknownType});
+        mlir::Value lowerX = utils.castUI32If(args[1]);
+        mlir::Value upperX = utils.castUI32If(args[2]);
+        mlir::Value lowerY = utils.castUI32If(args[3]);
+        mlir::Value upperY = utils.castUI32If(args[4]);
+        mlir::Value lowerZ = utils.castUI32If(args[5]);
+        mlir::Value upperZ = utils.castUI32If(args[6]);
+        return static_cast<mlir::Value>(builder.create<PartialReadOp>(loc, resType, /*filename = */ args[0], lowerX, upperX, lowerY, upperY, lowerZ, upperZ));
+    }
+
     if(func == "writeFrame" || func == "writeMatrix" || func == "write") {
         // Note that the type of arg already indicates if it is a frame or a
         // matrix.

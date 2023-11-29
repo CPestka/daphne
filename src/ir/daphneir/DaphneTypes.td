@@ -297,6 +297,12 @@ def Handle : Daphne_Type<"Handle"> {
     let genVerifyDecl = 1;
 }
 
+def Range : Daphne_Type<"Range"> {
+    let summary = "range";
+    let parameters = (ins "size_t":$lower, "size_t":$upper);
+    //let genVerifyDecl = 1;
+}
+
 // ****************************************************************************
 // Value types
 // ****************************************************************************

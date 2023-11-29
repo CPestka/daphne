@@ -1186,10 +1186,11 @@ mlir::LogicalResult mlir::daphne::NumCellsOp::canonicalize(mlir::daphne::NumCell
     } else if (auto t = inTy.dyn_cast<mlir::daphne::FrameType>()) {
         numRows = t.getNumRows();
         numCols = t.getNumCols();
-    } else if (auto t = inTy.dyn_cast<mlir::daphne::TensorType>()) {
-        numRows = t.getNumX() * t.getNumY() * t.getNumZ();
-        numCols = 1;
     }
+    // else if (auto t = inTy.dyn_cast<mlir::daphne::TensorType>()) {
+    //     numRows = t.getNumX() * t.getNumY() * t.getNumZ();
+    //     numCols = 1;
+    // }
 
     if (numRows != -1 && numCols != -1) {
         rewriter.replaceOpWithNewOp<mlir::daphne::ConstantOp>(
