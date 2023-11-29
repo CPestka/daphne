@@ -22,6 +22,8 @@
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Frame.h>
 #include <runtime/local/datastructures/Matrix.h>
+#include <runtime/local/datastructures/ContiguousTensor.h>
+#include <runtime/local/datastructures/ChunkedTensor.h>
 #include <runtime/local/kernels/BinaryOpCode.h>
 #include <runtime/local/kernels/EwBinarySca.h>
 
@@ -140,5 +142,23 @@ struct EwBinaryObjSca<Frame, Frame, VT> {
         }   
     }
 };
+
+// ----------------------------------------------------------------------------
+// ContiguousTensor <- ContiguousTensor, scalar
+// ----------------------------------------------------------------------------
+
+// template<typename VT>
+// struct EwBinaryObjSca<ContiguousTensor<VT>, ContiguousTensor<VT>, VT> {
+//     static void apply(BinaryOpCode opCode, ContiguousTensor<VT> *& res, const ContiguousTensor<VT> * lhs, VT rhs, DCTX(ctx)) {
+//         if(res == nullptr)
+//             res = DataObjectFactory::create<ContiguousTensor<VT>>(numRows, numCols, lhs->getSchema(), lhs->getLabels(), false);
+//     }
+// };
+
+
+// ----------------------------------------------------------------------------
+// ChunkedTensor <- ChunkedTensor, scalar
+// ----------------------------------------------------------------------------
+
 
 #endif //SRC_RUNTIME_LOCAL_KERNELS_EWBINARYOBJSCA_H

@@ -68,4 +68,4 @@ precompiled-dependencies/
 /compiler-debug-cuda.txt
 /compiler-trace-cuda.txt
 
-/uring_test_tmp
+uring_test_tmp.txt
