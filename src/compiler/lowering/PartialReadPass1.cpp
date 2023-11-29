@@ -21,6 +21,8 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/TypeID.h"
 
 #include <memory>
 #include <utility>
@@ -34,7 +36,6 @@ using namespace mlir;
 
 namespace {
     struct PartialRead : public RewritePattern {
-
         PartialRead(MLIRContext * context, PatternBenefit benefit = 1) : RewritePattern(Pattern::MatchAnyOpTypeTag(), benefit, context) {}
 
         LogicalResult matchAndRewrite(Operation* op, PatternRewriter &rewriter) const override {
@@ -47,6 +48,8 @@ namespace {
     };
 
     struct PartialReadPass1 : public PassWrapper <PartialReadPass1, OperationPass<ModuleOp>> {
+        MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PartialReadPass1)
+
         void runOnOperation() final;
 
         StringRef getArgument() const final { return "rewrite-sqlop"; }

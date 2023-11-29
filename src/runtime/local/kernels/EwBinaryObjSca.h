@@ -27,10 +27,14 @@
 #include <runtime/local/kernels/BinaryOpCode.h>
 #include <runtime/local/kernels/EwBinarySca.h>
 
-
 #include <cassert>
 #include <cstddef>
 #include <cstring>
+#include <stdexcept>
+#include "AggOpCode.h"
+#include "BinaryOpCode.h"
+
+// TODO: make opCode constexpr since it is constexpr known and removes the fn ptr stuff and runtime switches
 
 // ****************************************************************************
 // Struct for partial template specialization
@@ -143,22 +147,50 @@ struct EwBinaryObjSca<Frame, Frame, VT> {
     }
 };
 
+
 // ----------------------------------------------------------------------------
 // ContiguousTensor <- ContiguousTensor, scalar
 // ----------------------------------------------------------------------------
 
-// template<typename VT>
-// struct EwBinaryObjSca<ContiguousTensor<VT>, ContiguousTensor<VT>, VT> {
-//     static void apply(BinaryOpCode opCode, ContiguousTensor<VT> *& res, const ContiguousTensor<VT> * lhs, VT rhs, DCTX(ctx)) {
-//         if(res == nullptr)
-//             res = DataObjectFactory::create<ContiguousTensor<VT>>(numRows, numCols, lhs->getSchema(), lhs->getLabels(), false);
-//     }
-// };
+template<typename VT>
+struct EwBinaryObjSca<ContiguousTensor<VT>, ContiguousTensor<VT>, VT> {
+    static void apply(BinaryOpCode opCode, ContiguousTensor<VT> *& res, const ContiguousTensor<VT> * lhs, VT rhs, DCTX(ctx)) {
+        if (lhs == nullptr) {
+            throw std::runtime_error("Attempted nullptr deref in EwBinaryObjSca kernel");
+        }
+        if(res == nullptr) {
+            res = DataObjectFactory::create<ContiguousTensor<VT>>(lhs->data.get(), lhs->tensor_shape);
+
+            EwBinaryScaFuncPtr<VT, VT, VT> func = getEwBinaryScaFuncPtr<VT, VT, VT>(opCode);
+
+            for(size_t i=0; i<lhs->total_element_count; i++) {
+                res->data[i] = func(lhs->data[i], rhs, ctx);
+            }
+        }
+    }
+};
 
 
 // ----------------------------------------------------------------------------
 // ChunkedTensor <- ChunkedTensor, scalar
 // ----------------------------------------------------------------------------
 
+template<typename VT>
+struct EwBinaryObjSca<ChunkedTensor<VT>, ChunkedTensor<VT>, VT> {
+    static void apply(BinaryOpCode opCode, ChunkedTensor<VT> *& res, const ChunkedTensor<VT> * lhs, VT rhs, DCTX(ctx)) {
+        if (lhs == nullptr) {
+            throw std::runtime_error("Attempted nullptr deref in EwBinaryObjSca kernel");
+        }
+        if(res == nullptr) {
+            res = DataObjectFactory::create<ChunkedTensor<VT>>(lhs->tensor_shape, lhs->chunk_shape, InitCode::NONE);
+            
+            EwBinaryScaFuncPtr<VT, VT, VT> func = getEwBinaryScaFuncPtr<VT, VT, VT>(opCode);
+
+            for(size_t i=0; i<lhs->total_size_in_elements; i++) {
+                res->data[i] = func(lhs->data[i], rhs, ctx);
+            }
+        }
+    }
+};
 
 #endif //SRC_RUNTIME_LOCAL_KERNELS_EWBINARYOBJSCA_H

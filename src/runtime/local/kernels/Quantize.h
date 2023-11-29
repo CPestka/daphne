@@ -19,61 +19,71 @@
 #include <runtime/local/context/DaphneContext.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datastructures/ChunkedTensor.h>
+#include <runtime/local/datastructures/ContiguousTensor.h>
 
 #include <cassert>
 #include <cmath>
+#include <cstdint>
+#include <type_traits>
+#include <concepts>
+
+template<typename T>
+concept Float_t = std::is_floating_point<T>::value;
 
 // ****************************************************************************
 // Struct for partial template specialization
 // ****************************************************************************
 
-template<class DTRes, class DTArg>
+template<class DTRes, class DTArg, Float_t FloatType>
 struct Quantize {
-    static void apply(DTRes *& res, const DTArg * arg, float min, float max, DCTX(ctx)) = delete;
+    static void apply(DTRes *& res, const DTArg * arg, FloatType min, FloatType max, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
 // Convenience function
 // ****************************************************************************
 
-template<class DTRes, class DTArg>
-void quantize(DTRes *& res, const DTArg * arg, float min, float max, DCTX(ctx)) {
-    Quantize<DTRes, DTArg>::apply(res, arg, min, max, ctx);
+template<class DTRes, class DTArg, Float_t FloatType>
+void quantize(DTRes *& res, const DTArg * arg, FloatType min, FloatType max, DCTX(ctx)) {
+    Quantize<DTRes, DTArg, FloatType>::apply(res, arg, min, max, ctx);
 }
 
-void calc_quantization_params(float min, float max, float& scale, uint8_t& quantized_zero) {
+template<Float_t FloatType>
+void calc_quantization_params(FloatType min, FloatType max, FloatType& scale, uint8_t& quantized_zero) {
     // Make sure that 0 is included
-    min = (min > 0) ? 0 : min;
-    max = (max < 0) ? 0 : max;
+    min = (min > static_cast<FloatType>(0)) ? static_cast<FloatType>(0) : min;
+    max = (max < static_cast<FloatType>(0)) ? static_cast<FloatType>(0) : max;
 
     const uint8_t q_min = 0;
     const uint8_t q_max = 255;
 
-    scale = (max - min) / (1 + q_max - q_min);
+    scale = (max - min) / static_cast<FloatType>(1 + q_max - q_min);
 
-    float mapped_zero = q_max - max/scale;
-    if (mapped_zero < q_min) {
-        quantized_zero = q_min;
+    FloatType mapped_zero = static_cast<FloatType>(q_max) - max / scale;
+    if (mapped_zero < static_cast<FloatType>(q_min)) {
+        quantized_zero = static_cast<uint8_t>(q_min);
     }
-    else if (mapped_zero > q_max) {
-        quantized_zero = q_max;
+    else if (mapped_zero > static_cast<FloatType>(q_max)) {
+        quantized_zero = static_cast<uint8_t>(q_max);
     }
     else {
         // Rounds half-way cases away from zero.
-        quantized_zero = (uint8_t)(std::roundf(mapped_zero));
+        quantized_zero = static_cast<uint8_t>((std::roundf(mapped_zero)));
     }
 }
 
-uint8_t quantize_value(float a, float scale, uint8_t quantized_zero) {
+template<Float_t FloatType>
+uint8_t quantize_value(FloatType a, FloatType scale, uint8_t quantized_zero) {
     // Map
-    float value = static_cast<float>(quantized_zero) + a/scale;
+    FloatType value = static_cast<FloatType>(quantized_zero) + a / scale;
 
     // Clip
-    value = (value > 255) ? 255 : value;
-    value = (value < 0) ? 0 : value;
+    value = (value > static_cast<FloatType>(255)) ? static_cast<FloatType>(255) : value;
+    value = (value < static_cast<FloatType>(0)) ? static_cast<FloatType>(0) : value;
 
     // Round
-    return (uint8_t)(std::roundf(value));
+    return static_cast<uint8_t>((std::roundf(value)));
 }
 
 // ****************************************************************************
@@ -84,9 +94,9 @@ uint8_t quantize_value(float a, float scale, uint8_t quantized_zero) {
 // DenseMatrix <- DenseMatrix
 // ----------------------------------------------------------------------------
 
-template<>
-struct Quantize<DenseMatrix<uint8_t>, DenseMatrix<float>> {
-    static void apply(DenseMatrix<uint8_t> *& res, const DenseMatrix<float> * arg, float min, float max, DCTX(ctx)) {
+template<Float_t FloatType>
+struct Quantize<DenseMatrix<uint8_t>, DenseMatrix<FloatType>, FloatType> {
+    static void apply(DenseMatrix<uint8_t> *& res, const DenseMatrix<FloatType> * arg, FloatType min, FloatType max, DCTX(ctx)) {
         const size_t nr1 = arg->getNumRows();
         const size_t nc1 = arg->getNumCols();
 
@@ -98,13 +108,53 @@ struct Quantize<DenseMatrix<uint8_t>, DenseMatrix<float>> {
             assert((nc1 == res->getNumCols()) && "#cols of res and #cols of rhs must be the same");
         }
 
-        float scale = 0;
+        FloatType scale = 0;
         uint8_t q_zero = 0;
-        calc_quantization_params(min, max, scale, q_zero);
+        calc_quantization_params<FloatType>(min, max, scale, q_zero);
         for (int i = 0; i < (int)nr1; i++) {
             for (int j = 0; j < (int)nc1; j++) {
-                res->set(i,j, quantize_value(arg->get(i,j), scale, q_zero));
+                res->set(i,j, quantize_value<FloatType>(arg->get(i,j), scale, q_zero));
             }
+        }
+    }
+};
+
+// ----------------------------------------------------------------------------
+// ContiguousTensor <- ContiguousTensor
+// ----------------------------------------------------------------------------
+
+template<Float_t FloatType>
+struct Quantize<ContiguousTensor<uint8_t>, ContiguousTensor<FloatType>, FloatType> {
+    static void apply(ContiguousTensor<uint8_t> *& res, const ContiguousTensor<FloatType> * arg, FloatType min, FloatType max, DCTX(ctx)) {
+        if(res == nullptr) {
+            res = DataObjectFactory::create<ContiguousTensor<uint8_t>>(arg->tensor_shape, InitCode::NONE);
+        }
+
+        FloatType scale = 0;
+        uint8_t q_zero = 0;
+        calc_quantization_params<FloatType>(min, max, scale, q_zero);
+        for(size_t i=0; i<res->total_element_count; i++) {
+            res->data[i] = quantize_value<FloatType>(arg->data[i], scale, q_zero);
+        }
+    }
+};
+
+// ----------------------------------------------------------------------------
+// ContiguousTensor <- ContiguousTensor
+// ----------------------------------------------------------------------------
+
+template<Float_t FloatType>
+struct Quantize<ChunkedTensor<uint8_t>, ChunkedTensor<FloatType>, FloatType> {
+    static void apply(ChunkedTensor<uint8_t> *& res, const ChunkedTensor<FloatType> * arg, FloatType min, FloatType max, DCTX(ctx)) {
+        if(res == nullptr) {
+            res = DataObjectFactory::create<ChunkedTensor<uint8_t>>(arg->tensor_shape, arg->chunk_shape, InitCode::NONE);
+        }
+
+        FloatType scale = 0;
+        uint8_t q_zero = 0;
+        calc_quantization_params<FloatType>(min, max, scale, q_zero);
+        for(size_t i=0; i<res->total_size_in_elements; i++) {
+            res->data[i] = quantize_value<FloatType>(arg->data[i], scale, q_zero);
         }
     }
 };

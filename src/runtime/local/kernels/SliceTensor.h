@@ -28,6 +28,8 @@
 #include <cstddef>
 #include <cstdint>
 
+// IMO its a dice not a slice, but shrug*
+
 // ****************************************************************************
 // Struct for partial template specialization
 // ****************************************************************************
@@ -70,8 +72,11 @@ template<typename VT>
 struct SliceTensor<ChunkedTensor<VT>, ChunkedTensor<VT>> {
     static void apply(ChunkedTensor<VT> *& res, const ChunkedTensor<VT> * arg, size_t lowerInclX, size_t upperExclX, size_t lowerInclY, size_t upperExclY, size_t lowerInclZ, size_t upperExclZ, DCTX(ctx)) {
         std::vector<std::pair<size_t, size_t>> index_ranges {{lowerInclX, upperExclX}, {lowerInclY, upperExclY}, {lowerInclZ, upperExclZ}};
+
+        //TODO: use tryDice if id ranges dont match chunk boundaries and trsDiceAtChunkLevel otherwise
         //res = arg->tryDice(index_ranges);
     }
 };
 
+// TODO add slice chunked -> contiguous
 #endif //SRC_RUNTIME_LOCAL_KERNELS_SLICETENSOR_H

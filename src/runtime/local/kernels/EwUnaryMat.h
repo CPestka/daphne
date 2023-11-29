@@ -20,11 +20,15 @@
 #include <runtime/local/context/DaphneContext.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datastructures/ChunkedTensor.h>
+#include <runtime/local/datastructures/ContiguousTensor.h>
 #include <runtime/local/kernels/UnaryOpCode.h>
 #include <runtime/local/kernels/EwUnarySca.h>
 
 #include <cassert>
 #include <cstddef>
+
+// TODO: make opCode constexpr since it is constexpr known and removes the fn ptr stuff and runtime switches
 
 // ****************************************************************************
 // Struct for partial template specialization
@@ -71,6 +75,42 @@ struct EwUnaryMat<DenseMatrix<VT>, DenseMatrix<VT>> {
                 valuesRes[c] = func(valuesArg[c], ctx);
             valuesArg += arg->getRowSkip();
             valuesRes += res->getRowSkip();
+        }
+    }
+};
+
+// ----------------------------------------------------------------------------
+// ChunkedTensor <- ChunkedTensor
+// ----------------------------------------------------------------------------
+
+template<typename VT>
+struct EwUnaryMat<ChunkedTensor<VT>, ChunkedTensor<VT>> {
+    static void apply(UnaryOpCode opCode, ChunkedTensor<VT> *& res, const ChunkedTensor<VT> * arg, DCTX(ctx)) {
+        if(res == nullptr)
+            res = DataObjectFactory::create<ChunkedTensor<VT>>(arg->tensor_shape, arg->chunk_shape, InitCode::NONE);
+
+        EwUnaryScaFuncPtr<VT, VT> func = getEwUnaryScaFuncPtr<VT, VT>(opCode);
+        
+        for(size_t i = 0; i < res->total_size_in_elements; i++) {
+            res->data[i] = func(arg->data[i], ctx);
+        }
+    }
+};
+
+// ----------------------------------------------------------------------------
+// ContiguousTensor <- ContiguousTensor
+// ----------------------------------------------------------------------------
+
+template<typename VT>
+struct EwUnaryMat<ContiguousTensor<VT>, ContiguousTensor<VT>> {
+    static void apply(UnaryOpCode opCode, ContiguousTensor<VT> *& res, const ContiguousTensor<VT> * arg, DCTX(ctx)) {
+        if(res == nullptr)
+            res = DataObjectFactory::create<ContiguousTensor<VT>>(arg->data.get(), arg->tensor_shape);
+
+        EwUnaryScaFuncPtr<VT, VT> func = getEwUnaryScaFuncPtr<VT, VT>(opCode);
+        
+        for(size_t i = 0; i < res->total_element_count; i++) {
+            res->data[i] = func(arg->data[i], ctx);
         }
     }
 };

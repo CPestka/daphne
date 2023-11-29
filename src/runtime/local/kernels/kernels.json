@@ -54,6 +54,117 @@
     },
     {
         "kernelTemplate": {
+            "header": "Agg.h",
+            "opName": "agg",
+            "returnType": "VTRes *",
+            "templateParams": [
+                {
+                    "name": "VTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "DTArg",
+                    "isDataType": true
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "AggOpCode",
+                    "name": "opCode"
+                },
+                {
+                    "type": "bool *",
+                    "name": "agg_dimension_mask"
+                },
+                {
+                    "type": "DTArg *",
+                    "name": "arg"
+                }
+            ]
+        },
+        "api": [
+            {
+                "name":  ["CPP"],
+                "instantiations": [
+                    [["ContiguousTensor", "double"], ["ContiguousTensor", "double"]],
+                    [["ContiguousTensor", "float"], ["ContiguousTensor", "float"]],
+                    [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "uint64_t"]],
+                    [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "uint32_t"]],
+                    [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "uint8_t"]],
+                    [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "int64_t"]],
+                    [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "int32_t"]],
+                    [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "int8_t"]],
+
+                    [["ChunkedTensor", "double"], ["ChunkedTensor", "double"]],
+                    [["ChunkedTensor", "float"], ["ChunkedTensor", "float"]],
+                    [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "uint64_t"]],
+                    [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "uint32_t"]],
+                    [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "uint8_t"]],
+                    [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "int64_t"]],
+                    [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "int32_t"]],
+                    [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "int8_t"]]
+                ],
+                "opCodes": ["SUM", "MIN", "MAX", "MEAN", "PROD", "STDDEV"]
+            }
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "AggSparse.h",
+            "opName": "aggSparse",
+            "returnType": "VTRes *",
+            "templateParams": [
+                {
+                    "name": "VTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "DTArg",
+                    "isDataType": true
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "AggOpCode",
+                    "name": "opCode"
+                },
+                {
+                    "type": "bool *",
+                    "name": "agg_dimension_mask"
+                },
+                {
+                    "type": "size_t *",
+                    "name": "lhs_range_values"
+                },
+                {
+                    "type": "size_t *",
+                    "name": "rhs_range_values"
+                },
+                {
+                    "type": "DTArg *",
+                    "name": "arg"
+                }
+            ]
+        },
+        "api": [
+            {
+                "name":  ["CPP"],
+                "instantiations": [
+                    [["ChunkedTensor", "double"], ["ChunkedTensor", "double"]],
+                    [["ChunkedTensor", "float"], ["ChunkedTensor", "float"]],
+                    [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "uint64_t"]],
+                    [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "uint32_t"]],
+                    [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "uint8_t"]],
+                    [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "int64_t"]],
+                    [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "int32_t"]],
+                    [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "int8_t"]]
+                ],
+                "opCodes": ["SUM", "MIN", "MAX", "MEAN", "PROD", "STDDEV"]
+            }
+        ]
+    },
+    {
+        "kernelTemplate": {
             "header": "AggCol.h",
             "opName": "aggCol",
             "returnType": "void",
@@ -365,7 +476,187 @@
             [["DenseMatrix","int64_t"],["CSRMatrix","int64_t"]],
             [["CSRMatrix","double"], ["DenseMatrix","double"]],
             [["CSRMatrix","float"], ["DenseMatrix","float"]],
-            [["CSRMatrix","int64_t"], ["DenseMatrix","int64_t"]]
+            [["CSRMatrix","int64_t"], ["DenseMatrix","int64_t"]],
+
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "int8_t"]],
+
+            [["ContiguousTensor", "float"], ["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "float"], ["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "float"], ["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "float"], ["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "float"], ["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "float"], ["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "float"], ["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "float"], ["ContiguousTensor", "int8_t"]],
+
+            [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "int8_t"]],
+
+            [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "int8_t"]],
+
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "int8_t"]],
+
+            [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "int8_t"]],
+
+            [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "int8_t"]],
+
+            [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "int8_t"]],
+
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "int8_t"]],
+
+            [["ChunkedTensor", "float"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "float"], ["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "float"], ["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "float"], ["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "float"], ["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "float"], ["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "float"], ["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "float"], ["ChunkedTensor", "int8_t"]],
+
+            [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "int8_t"]],
+
+            [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "int8_t"]],
+
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "int8_t"]],
+
+            [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "int8_t"]],
+
+            [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "int8_t"]],
+
+            [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "int8_t"]],
+                    
+            [["ContiguousTensor", "double"], ["ChunkedTensor", "double"]],
+            [["ContiguousTensor", "float"], ["ChunkedTensor", "float"]],
+            [["ContiguousTensor", "uint64_t"], ["ChunkedTensor", "uint64_t"]],
+            [["ContiguousTensor", "uint32_t"], ["ChunkedTensor", "uint32_t"]],
+            [["ContiguousTensor", "uint8_t"], ["ChunkedTensor", "uint8_t"]],
+            [["ContiguousTensor", "int64_t"], ["ChunkedTensor", "int64_t"]],
+            [["ContiguousTensor", "int32_t"], ["ChunkedTensor", "int32_t"]],
+            [["ContiguousTensor", "int8_t"], ["ChunkedTensor", "int8_t"]],
+
+            [["ChunkedTensor", "double"], ["ContiguousTensor", "double"]],
+            [["ChunkedTensor", "float"], ["ContiguousTensor", "float"]],
+            [["ChunkedTensor", "uint64_t"], ["ContiguousTensor", "uint64_t"]],
+            [["ChunkedTensor", "uint32_t"], ["ContiguousTensor", "uint32_t"]],
+            [["ChunkedTensor", "uint8_t"], ["ContiguousTensor", "uint8_t"]],
+            [["ChunkedTensor", "int64_t"], ["ContiguousTensor", "int64_t"]],
+            [["ChunkedTensor", "int32_t"], ["ContiguousTensor", "int32_t"]],
+            [["ChunkedTensor", "int8_t"], ["ContiguousTensor", "int8_t"]],
+
+            [["DenseMatrix", "double"], ["ContiguousTensor", "double"]],
+            [["DenseMatrix", "float"], ["ContiguousTensor", "float"]],
+            [["DenseMatrix", "uint64_t"], ["ContiguousTensor", "uint64_t"]],
+            [["DenseMatrix", "uint32_t"], ["ContiguousTensor", "uint32_t"]],
+            [["DenseMatrix", "uint8_t"], ["ContiguousTensor", "uint8_t"]],
+            [["DenseMatrix", "int64_t"], ["ContiguousTensor", "int64_t"]],
+            [["DenseMatrix", "int32_t"], ["ContiguousTensor", "int32_t"]],
+            [["DenseMatrix", "int8_t"], ["ContiguousTensor", "int8_t"]],
+
+            [["ContiguousTensor", "double"], ["DenseMatrix", "double"]],
+            [["ContiguousTensor", "float"], ["DenseMatrix", "float"]],
+            [["ContiguousTensor", "uint64_t"], ["DenseMatrix", "uint64_t"]],
+            [["ContiguousTensor", "uint32_t"], ["DenseMatrix", "uint32_t"]],
+            [["ContiguousTensor", "uint8_t"], ["DenseMatrix", "uint8_t"]],
+            [["ContiguousTensor", "int64_t"], ["DenseMatrix", "int64_t"]],
+            [["ContiguousTensor", "int32_t"], ["DenseMatrix", "int32_t"]],
+            [["ContiguousTensor", "int8_t"], ["DenseMatrix", "int8_t"]]
         ]
     },
     {
@@ -412,7 +703,25 @@
             ["int64_t", ["DenseMatrix", "size_t"]],
 
             ["double", "Frame"],
-            ["int64_t", "Frame"]
+            ["int64_t", "Frame"],
+
+            ["double", ["ContiguousTensor", "double"]],
+            ["float", ["ContiguousTensor", "float"]],
+            ["int64_t", ["ContiguousTensor", "int64_t"]],
+            ["int32_t", ["ContiguousTensor", "int32_t"]],
+            ["int8_t", ["ContiguousTensor", "int8_t"]],
+            ["uint64_t", ["ContiguousTensor", "uint64_t"]],
+            ["uint32_t", ["ContiguousTensor", "uint32_t"]],
+            ["uint8_t", ["ContiguousTensor", "uint8_t"]],
+
+            ["double", ["ChunkedTensor", "double"]],
+            ["float", ["ChunkedTensor", "float"]],
+            ["int64_t", ["ChunkedTensor", "int64_t"]],
+            ["int32_t", ["ChunkedTensor", "int32_t"]],
+            ["int8_t", ["ChunkedTensor", "int8_t"]],
+            ["uint64_t", ["ChunkedTensor", "uint64_t"]],
+            ["uint32_t", ["ChunkedTensor", "uint32_t"]],
+            ["uint8_t", ["ChunkedTensor", "uint8_t"]]
         ]
     },
     {
@@ -1167,9 +1476,28 @@
                 "instantiations": [
                     [["DenseMatrix", "uint64_t"], ["DenseMatrix", "uint64_t"], "uint64_t"],
                     [["DenseMatrix", "size_t"], ["DenseMatrix", "size_t"], "size_t"],
+
                     ["Frame", "Frame", "float"],
                     ["Frame", "Frame", "double"],
-                    ["Frame", "Frame", "int64_t"]
+                    ["Frame", "Frame", "int64_t"],
+
+                    [["ChunkedTensor", "double"], ["ChunkedTensor", "double"], "double"],
+                    [["ChunkedTensor", "float"], ["ChunkedTensor", "float"], "float"],
+                    [["ChunkedTensor", "uint64_t"], ["ChunkedTensor", "uint64_t"], "uint64_t"],
+                    [["ChunkedTensor", "uint32_t"], ["ChunkedTensor", "uint32_t"], "uint32_t"],
+                    [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "uint8_t"], "uint8_t"],
+                    [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "int64_t"], "int64_t"],
+                    [["ChunkedTensor", "int32_t"], ["ChunkedTensor", "int32_t"], "int32_t"],
+                    [["ChunkedTensor", "int8_t"], ["ChunkedTensor", "int8_t"], "int8_t"],
+
+                    [["ContiguousTensor", "double"], ["ContiguousTensor", "double"], "double"],
+                    [["ContiguousTensor", "float"], ["ContiguousTensor", "float"], "float"],
+                    [["ContiguousTensor", "uint64_t"], ["ContiguousTensor", "uint64_t"], "uint64_t"],
+                    [["ContiguousTensor", "uint32_t"], ["ContiguousTensor", "uint32_t"], "uint32_t"],
+                    [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "uint8_t"], "uint8_t"],
+                    [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "int64_t"], "int64_t"],
+                    [["ContiguousTensor", "int32_t"], ["ContiguousTensor", "int32_t"], "int32_t"],
+                    [["ContiguousTensor", "int8_t"], ["ContiguousTensor", "int8_t"], "int8_t"]
                 ],
                 "opCodes": ["ADD", "SUB", "MUL", "DIV", "POW", "LOG", "MOD", "EQ", "NEQ", "LT", "LE", "GT", "GE", "MIN", "MAX", "AND", "OR", "BITWISE_AND"]
             }
@@ -1567,7 +1895,112 @@
                     [["DenseMatrix", "double"], "double"],
                     [["DenseMatrix", "int64_t"], "int64_t"],
                     [["DenseMatrix", "uint64_t"], "uint64_t"],
-                    [["DenseMatrix", "uint8_t"], "uint8_t"]]
+                    [["DenseMatrix", "uint8_t"], "uint8_t"]
+                ]
+            }
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "Fill.h",
+            "opName": "fillContiguousTensor",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "VTArg",
+                    "isDataType": false
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "DTRes *&",
+                    "name": "res"
+                },
+                {
+                    "type": "VTArg",
+                    "name": "arg"
+                },
+                {
+                    "type": "size_t *",
+                    "name": "tensor_shape"
+                },
+                {
+                    "type": "size_t",
+                    "name": "rank"
+                }
+            ]
+        },
+        "api": [
+            {
+                "name":  ["CPP"],
+                "instantiations": [
+                    [["ContiguousTensor", "double"], "double"],
+                    [["ContiguousTensor", "float"], "float"],
+                    [["ContiguousTensor", "uint64_t"], "uint64_t"],
+                    [["ContiguousTensor", "uint32_t"], "uint32_t"],
+                    [["ContiguousTensor", "uint8_t"], "uint8_t"],
+                    [["ContiguousTensor", "int64_t"], "int64_t"],
+                    [["ContiguousTensor", "int32_t"], "int32_t"],
+                    [["ContiguousTensor", "int8_t"], "int8_t"]
+                ]
+            }
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "Fill.h",
+            "opName": "fillChunkedTensor",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "VTArg",
+                    "isDataType": false
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "DTRes *&",
+                    "name": "res"
+                },
+                {
+                    "type": "VTArg",
+                    "name": "arg"
+                },
+                {
+                    "type": "size_t *",
+                    "name": "tensor_shape"
+                },
+                {
+                    "type": "size_t *",
+                    "name": "chunk_shape"
+                },
+                {
+                    "type": "size_t",
+                    "name": "rank"
+                }
+            ]
+        },
+        "api": [
+            {
+                "name":  ["CPP"],
+                "instantiations": [
+                    [["ChunkedTensor", "double"], "double"],
+                    [["ChunkedTensor", "float"], "float"],
+                    [["ChunkedTensor", "uint64_t"], "uint64_t"],
+                    [["ChunkedTensor", "uint32_t"], "uint32_t"],
+                    [["ChunkedTensor", "uint8_t"], "uint8_t"],
+                    [["ChunkedTensor", "int64_t"], "int64_t"],
+                    [["ChunkedTensor", "int32_t"], "int32_t"],
+                    [["ChunkedTensor", "int8_t"], "int8_t"]
+                ]
             }
         ]
     },
@@ -2867,7 +3300,13 @@
         },
         "instantiations": [
             [["DenseMatrix", "double"],["DenseMatrix", "double"]],
-            [["DenseMatrix", "int64_t"],["DenseMatrix", "int64_t"]]
+            [["DenseMatrix", "int64_t"],["DenseMatrix", "int64_t"]],
+
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "int64_t"], ["ContiguousTensor", "int64_t"]],
+
+            [["ChunkedTensor", "double"], ["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "int64_t"], ["ChunkedTensor", "int64_t"]]
         ],
         "opCodes": ["SIGN", "SQRT", "EXP", "ABS", "FLOOR", "CEIL", "ROUND"]
     },
@@ -3623,6 +4062,10 @@
                 {
                     "name": "DTArg",
                     "isDataType": true
+                },
+                {
+                    "name": "FloatType",
+                    "isDataType": false
                 }
             ],
             "runtimeParams": [
@@ -3639,7 +4082,14 @@
             ]
 	},
         "instantiations": [
-            [["DenseMatrix", "uint8_t"], ["DenseMatrix", "float"]]
+            [["DenseMatrix", "uint8_t"], ["DenseMatrix", "float"], "float"],
+            [["DenseMatrix", "uint8_t"], ["DenseMatrix", "double"], "double"],
+
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "float"], "float"],
+            [["ContiguousTensor", "uint8_t"], ["ContiguousTensor", "double"], "double"],
+
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "float"], "float"],
+            [["ChunkedTensor", "uint8_t"], ["ChunkedTensor", "double"], "double"]
 	]
     },
     {
@@ -4065,6 +4515,48 @@
         },
         "instantiations": [
             ["Frame"]
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "ReduceRank.h",
+            "opName": "reduceRank",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "VT",
+                    "isDataType": true
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "VT *",
+                    "name": "arg"
+                },
+                {
+                    "type": "size_t",
+                    "name": "dim"
+                }
+            ]
+        },
+        "instantiations": [
+            [["ChunkedTensor", "double"]],
+            [["ChunkedTensor", "float"]],
+            [["ChunkedTensor", "uint64_t"]],
+            [["ChunkedTensor", "uint32_t"]],
+            [["ChunkedTensor", "uint8_t"]],
+            [["ChunkedTensor", "int64_t"]],
+            [["ChunkedTensor", "int32_t"]],
+            [["ChunkedTensor", "int8_t"]],
+
+            [["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "uint32_t"]],
+            [["ContiguousTensor", "uint8_t"]],
+            [["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "int32_t"]],
+            [["ContiguousTensor", "int8_t"]]
         ]
     },
     {
