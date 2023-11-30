@@ -280,6 +280,8 @@ struct ReadZarr<ChunkedTensor<VT>> {
             }
         }
 
+        std::cout << "Reading " << chunk_ids.size() << " out of " << chunk_ids.size() << " chunks" << std::endl;
+
         if ((std::endian::native != std::endian::little) && (std::endian::native != std::endian::big)) {
             throw std::runtime_error(
               "ReadZarr->ChunkedTensor: Native endianness that is not either little or big endian is not "
@@ -353,8 +355,10 @@ struct PartialReadZarr<ChunkedTensor<VT>> {
         auto byte_order          = fmd.byte_order;
         std::vector<size_t> chunks_per_dim;
         chunks_per_dim.resize(fmd.shape.size());
+        uint64_t total_number_of_chunks = 1;
         for (size_t i = 0; i < chunks_per_dim.size(); i++) {
             chunks_per_dim[i] = fmd.shape[i] / fmd.chunks[i];
+            total_number_of_chunks *= chunks_per_dim[i];
         }
         uint64_t elements_per_chunk = fmd.chunks[0];
         for (size_t i = 1; i < chunks_per_dim.size(); i++) {
@@ -380,14 +384,13 @@ struct PartialReadZarr<ChunkedTensor<VT>> {
         }
 
         // Convert element ranges into list of chunks required
-        std::optional<std::vector<std::vector<size_t>>> requested_chunk_ids =
-          res->GetChunkListFromIdRange(element_id_ranges);
+        std::optional<std::vector<std::vector<size_t>>> requested_chunk_ids = res->GetChunkListFromIdRange(element_id_ranges);
 
         if (!requested_chunk_ids) {
-            throw std::runtime_error(
-              "PartialReadZarr->ChunkedTensor: Invalid element range. Range out of bounds or has missmatching "
-              "dimension");
+            throw std::runtime_error("PartialReadZarr->ChunkedTensor: Invalid element range. Range out of bounds or has mismatching dimension");
         }
+
+        std::cout << "Reading " << requested_chunk_ids.value().size() << " out of " << total_number_of_chunks << " chunks" << std::endl;
 
         // Match requested chunks to the available chunks in the fs, discard not-requested files and throw on missing
         // file
