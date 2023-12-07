@@ -107,13 +107,10 @@ void DaphneDSLVisitor::handleAssignmentPart(
 
 template<class ExtractAxOp, class SliceAxOp, class NumAxOp>
 mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value arg, antlrcpp::Any ax, bool allowLabel) {
-    //std::cout << "applyRightIndexing" << std::endl;
     if(ax.is<mlir::Value>()) { // indexing with a single SSA value (no ':')
-        //std::cout << "indexing with a single SSA value (no ':')" << std::endl;
         mlir::Value axVal = ax.as<mlir::Value>();
         // data object
         if(CompilerUtils::hasObjType(axVal)) {
-            //std::cout << "CompilerUtils::hasObjType(axVal)" << std::endl;
             return utils.retValWithInferedType(builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal));
         }
         else if(axVal.getType().isa<mlir::daphne::StringType>()) { // string
@@ -128,7 +125,6 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
         }
         else // scalar
         {
-            //std::cout << "axVal.getType() scalar" << std::endl;
             return utils.retValWithInferedType(
                     builder.create<SliceAxOp>(
                             loc, utils.unknownType, arg,
@@ -147,7 +143,6 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
         }
     }
     else if(ax.is<std::pair<mlir::Value, mlir::Value>>()) { // indexing with a range (':')
-        //std::cout << "indexing with a range (':')" << std::endl;
         auto axPair = ax.as<std::pair<mlir::Value, mlir::Value>>();
         auto axLowerIncl = axPair.first;
         auto axUpperExcl = axPair.second;
@@ -1085,49 +1080,54 @@ antlrcpp::Any DaphneDSLVisitor::visitRightIdxFilterExpr(DaphneDSLGrammarParser::
 
 antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser::RightIdxExtractExprContext * ctx) {
     mlir::Value obj = utils.valueOrError(visit(ctx->obj));
-    //std::cout << "antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser::RightIdxExtractExprContext * ctx) {" << std::endl;
     auto indexing = visit(ctx->idx).as<std::vector<std::pair<bool, antlrcpp::Any>>>();
 
-    if (obj.getType().isa<mlir::daphne::TensorType>()) {
-        std::vector<mlir::Value> ranges;
+    if (indexing.size() > 3) {
+        throw std::runtime_error("Tensors are only supported with at most 3 dimensions");
+    }
+
+    bool isTensor = obj.getType().isa<mlir::daphne::TensorType>();
+    if (indexing.size() < 3 && isTensor) {
+        std::stringstream msg;
+        msg << "Cannot apply indexing with " << indexing.size() << " dimensions on a data type that is tensor";
+        throw std::runtime_error(msg.str());
+    }
+
+    if ((indexing.size() > 2 && !isTensor)) {
+        std::stringstream msg;
+        msg << "Cannot apply indexing with " << indexing.size() << " dimensions on a data type that is not tensor";
+        throw std::runtime_error(msg.str());
+    }
+
+    mlir::Location loc = utils.getLoc(ctx->idx->start);
+
+    if (isTensor) {
+        std::vector<mlir::Value> vals;
+        using MLIRValuePair = std::pair<mlir::Value,mlir::Value>;
         for (size_t i = 0; i < indexing.size(); ++i) {
             if (indexing[i].second.is<mlir::Value>()) {
-                //mlir::Value numLower = utils.castSizeIf(indexing[i].second.as<mlir::Value>());
-                // mlir::Value numUpper = utils.castSizeIf(builder.create<mlir::daphne::EwAddOp>(utils.getLoc(ctx->idx->start), builder.getIntegerType(64, false), utils.castSI64If(numLower),
-                //                             builder.create<mlir::daphne::ConstantOp>(utils.getLoc(ctx->idx->start), static_cast<int64_t>(1))
-                //                     )
-                //             );
-            } else if (indexing[i].second.is<std::pair<mlir::Value,mlir::Value>>()) {
-                //mlir::Value numLower = utils.castSizeIf(indexing[i].second.as<std::pair<mlir::Value,mlir::Value>>().first);
-                //mlir::Value numUpper = utils.castSizeIf(indexing[i].second.as<std::pair<mlir::Value,mlir::Value>>().second);
+                mlir::Value numLower = utils.castSizeIf(indexing[i].second.as<mlir::Value>());
+                mlir::daphne::ConstantOp cop = builder.create<mlir::daphne::ConstantOp>(loc, static_cast<int64_t>(1));
+                mlir::daphne::EwAddOp add = builder.create<mlir::daphne::EwAddOp>(loc, builder.getIntegerType(64, false), utils.castSI64If(numLower), cop);
+                mlir::Value numUpper = utils.castSizeIf(add);
+                vals.push_back(numLower);
+                vals.push_back(numUpper);
+            } else if (indexing[i].second.is<MLIRValuePair>()) {
+                auto range = indexing[i].second.as<MLIRValuePair>();
+                if (range.first) {
+                    vals.push_back(utils.castSizeIf(range.first));
+                } else {
+                    vals.push_back(utils.castSizeIf(builder.create<mlir::daphne::ConstantOp>(loc, static_cast<int64_t>(0))));
+                }
+                if (range.second) {
+                    vals.push_back(utils.castSizeIf(range.second));
+                } else {
+                    // shape max
+                    vals.push_back(utils.castSizeIf(builder.create<mlir::daphne::ConstantOp>(loc, static_cast<int64_t>(100))));
+                }
             }
         }
-        if (indexing[0].second.is<mlir::Value>()) {
-            mlir::Value numXLower = utils.castSizeIf(indexing[0].second.as<mlir::Value>());
-            mlir::Value numXUpper = utils.castSizeIf(builder.create<mlir::daphne::EwAddOp>(utils.getLoc(ctx->idx->start), builder.getIntegerType(64, false), utils.castSI64If(numXLower),
-                                            builder.create<mlir::daphne::ConstantOp>(utils.getLoc(ctx->idx->start), static_cast<int64_t>(1))
-                                    )
-                            );
-            mlir::Value numYLower = utils.castSizeIf(indexing[1].second.as<mlir::Value>());
-            mlir::Value numYUpper = utils.castSizeIf(builder.create<mlir::daphne::EwAddOp>(utils.getLoc(ctx->idx->start), builder.getIntegerType(64, false), utils.castSI64If(numYLower),
-                                            builder.create<mlir::daphne::ConstantOp>(utils.getLoc(ctx->idx->start), static_cast<int64_t>(1))
-                                    )
-                            );
-            mlir::Value numZLower = utils.castSizeIf(indexing[2].second.as<mlir::Value>());
-            mlir::Value numZUpper = utils.castSizeIf(builder.create<mlir::daphne::EwAddOp>(utils.getLoc(ctx->idx->start), builder.getIntegerType(64, false), utils.castSI64If(numZLower),
-                                            builder.create<mlir::daphne::ConstantOp>(utils.getLoc(ctx->idx->start), static_cast<int64_t>(1))
-                                    )
-                            );
-            return utils.retValWithInferedType(builder.create<mlir::daphne::SliceTensorOp>(utils.getLoc(ctx->idx->start), utils.unknownType, obj, numXLower, numXUpper, numYLower, numYUpper, numZLower, numZUpper));
-        } else if (indexing[0].second.is<std::pair<mlir::Value,mlir::Value>>()) {
-            mlir::Value numXLower = utils.castSizeIf(indexing[0].second.as<std::pair<mlir::Value,mlir::Value>>().first);
-            mlir::Value numXUpper = utils.castSizeIf(indexing[0].second.as<std::pair<mlir::Value,mlir::Value>>().second);
-            mlir::Value numYLower = utils.castSizeIf(indexing[1].second.as<std::pair<mlir::Value,mlir::Value>>().first);
-            mlir::Value numYUpper = utils.castSizeIf(indexing[1].second.as<std::pair<mlir::Value,mlir::Value>>().second);
-            mlir::Value numZLower = utils.castSizeIf(indexing[2].second.as<std::pair<mlir::Value,mlir::Value>>().first);
-            mlir::Value numZUpper = utils.castSizeIf(indexing[2].second.as<std::pair<mlir::Value,mlir::Value>>().second);
-            return utils.retValWithInferedType(builder.create<mlir::daphne::SliceTensorOp>(utils.getLoc(ctx->idx->start), utils.unknownType, obj, numXLower, numXUpper, numYLower, numYUpper, numZLower, numZUpper));
-        }
+        return utils.retValWithInferedType(builder.create<mlir::daphne::SliceTensorOp>(loc, utils.unknownType, obj, vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]));
     }
 
     auto rows = indexing[0];
@@ -1136,14 +1136,10 @@ antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser:
     // TODO Use location of rows/cols in utils.getLoc(...) for better
     // error messages.
     if(rows.first) // rows specified
-        obj = applyRightIndexing<
-                mlir::daphne::ExtractRowOp,
-                mlir::daphne::SliceRowOp,
-                mlir::daphne::NumRowsOp
-        >(utils.getLoc(ctx->idx->start), obj, rows.second, false);
+        obj = applyRightIndexing<mlir::daphne::ExtractRowOp,mlir::daphne::SliceRowOp,mlir::daphne::NumRowsOp>(loc, obj, rows.second, false);
     if(cols.first) // cols specified
         obj = applyRightIndexing<mlir::daphne::ExtractColOp, mlir::daphne::SliceColOp, mlir::daphne::NumColsOp
-        >(utils.getLoc(ctx->idx->start), obj, cols.second, obj.getType().isa<mlir::daphne::FrameType>());
+        >(loc, obj, cols.second, obj.getType().isa<mlir::daphne::FrameType>());
 
     // Note: If rows and cols are specified, we create two extraction steps.
     // This can be inefficient, but it is simpler for now.
@@ -1356,7 +1352,6 @@ antlrcpp::Any DaphneDSLVisitor::visitMatrixLiteralExpr(DaphneDSLGrammarParser::M
 }
 
 antlrcpp::Any DaphneDSLVisitor::visitIndexing(DaphneDSLGrammarParser::IndexingContext * ctx) {
-    //std::cout << "visitIndexing (" << ctx->range().size() << ")" << std::endl;
     std::vector<std::pair<bool, antlrcpp::Any>> ranges;
     for (size_t i = 0; i < ctx->range().size(); ++i) {
         auto range = visit(ctx->range(i)).as<std::pair<bool, antlrcpp::Any>>();
@@ -1366,13 +1361,10 @@ antlrcpp::Any DaphneDSLVisitor::visitIndexing(DaphneDSLGrammarParser::IndexingCo
 }
 
 antlrcpp::Any DaphneDSLVisitor::visitRange(DaphneDSLGrammarParser::RangeContext * ctx) {
-    //std::cout << "visitRange" << std::endl;
     if(ctx->pos) {
-        //std::cout << "return single value!" << std::endl;
         return std::make_pair(true, antlrcpp::Any(utils.valueOrError(visit(ctx->pos))));
     }
     else {
-        //std::cout << "return multiple values!" << std::endl;
         mlir::Value posLowerIncl = ctx->posLowerIncl ? utils.valueOrError(visit(ctx->posLowerIncl)) : nullptr;
         mlir::Value posUpperExcl = ctx->posUpperExcl ? utils.valueOrError(visit(ctx->posUpperExcl)) : nullptr;
         return std::make_pair(
