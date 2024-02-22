@@ -47,7 +47,7 @@ class ContiguousTensor : public Tensor<ValueType> {
             strides[0] = 1;
         }
 
-        for(size_t i=0; i<this->rank; i++) {
+        for (size_t i = 0; i < this->rank; i++) {
             if (tensor_shape[i] == 0) {
                 throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
             }
@@ -89,19 +89,27 @@ class ContiguousTensor : public Tensor<ValueType> {
             }
         }
     };
-    
+
     template<typename VTArg>
     ContiguousTensor(const ContiguousTensor<VTArg> *other)
         : Tensor<ValueType>::Tensor(other->tensor_shape), strides(other->strides) {
-        // workarround for old versions of gcc with template specialization bug
-        //https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85282
-        if constexpr (std::is_same<VTArg, ValueType>::value) { 
-            data = other->data;
-        } else {
-            data = std::make_shared<ValueType[]>(this->total_element_count);
-         for(size_t i=0; i<this->total_element_count; i++) {
+        // And now the workaround broke -> complie error on eval of constexpr branch that is not supposed to be
+        // evaled...
+
+        // // workarround for of gcc with template specialization bug
+        // //https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85282
+        // if constexpr (std::is_same<VTArg, ValueType>::value) {
+        //     data = other->data;
+        // } else {
+        //     data = std::make_shared<ValueType[]>(this->total_element_count);
+        //  for(size_t i=0; i<this->total_element_count; i++) {
+        //     data[i] = static_cast<ValueType>(other->data[i]);
+        //  }
+        // }
+        data = std::make_shared<ValueType[]>(this->total_element_count);
+        //data(new ValueType[this->total_element_count], std::default_delete<ValueType[]>());
+        for (size_t i = 0; i < this->total_element_count; i++) {
             data[i] = static_cast<ValueType>(other->data[i]);
-         }
         }
     };
 
@@ -112,7 +120,7 @@ class ContiguousTensor : public Tensor<ValueType> {
     ContiguousTensor(const DenseMatrix<ValueType> *other)
         : Tensor<ValueType>::Tensor(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
         strides = {1, other->getNumCols()};
-        for(size_t i=0; i<this->rank; i++) {
+        for (size_t i = 0; i < this->rank; i++) {
             if (this->tensor_shape[i] == 0) {
                 throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
             }
@@ -128,7 +136,7 @@ class ContiguousTensor : public Tensor<ValueType> {
             strides[0] = 1;
         }
 
-        for(size_t i=0; i<this->rank; i++) {
+        for (size_t i = 0; i < this->rank; i++) {
             if (this->tensor_shape[i] == 0) {
                 throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
             }
@@ -141,7 +149,7 @@ class ContiguousTensor : public Tensor<ValueType> {
         std::memcpy(data.get(), input_data, this->total_element_count * sizeof(ValueType));
     }
 
-    ContiguousTensor(std::shared_ptr<ValueType[]>& input_data, const std::vector<size_t> &tensor_shape)
+    ContiguousTensor(std::shared_ptr<ValueType[]> &input_data, const std::vector<size_t> &tensor_shape)
         : Tensor<ValueType>::Tensor(tensor_shape) {
         data = input_data;
         strides.resize(this->rank);
@@ -149,7 +157,7 @@ class ContiguousTensor : public Tensor<ValueType> {
             strides[0] = 1;
         }
 
-        for(size_t i=0; i<this->rank; i++) {
+        for (size_t i = 0; i < this->rank; i++) {
             if (this->tensor_shape[i] == 0) {
                 throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
             }
@@ -168,7 +176,7 @@ class ContiguousTensor : public Tensor<ValueType> {
             strides[0] = 1;
         }
 
-        for(size_t i=0; i<this->rank; i++) {
+        for (size_t i = 0; i < this->rank; i++) {
             if (this->tensor_shape[i] == 0) {
                 throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
             }
@@ -293,7 +301,7 @@ class ContiguousTensor : public Tensor<ValueType> {
         if (index_ranges.size() != this->rank) {
             return nullptr;
         }
-        
+
         for (size_t i = 0; i < this->rank; i++) {
             index_ranges[i] = {std::get<0>(index_ranges[i]), std::get<1>(index_ranges[i]) - 1};
             if (std::get<0>(index_ranges[i]) >= this->tensor_shape[i] ||

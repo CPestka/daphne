@@ -20,6 +20,10 @@
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
+def ArrayRefType : TypeParameter<"::llvm::ArrayRef<ssize_t>", "Array ref of int parameters"> {
+    let allocator = "$_dst = $_allocator.copyInto($_self);";
+}
+
 // ****************************************************************************
 // General
 // ****************************************************************************
@@ -221,7 +225,7 @@ def Tensor : Daphne_Type<"Tensor"> {
     // TODO Maybe we should rename "element type" to "value type" everywhere.
     let parameters = (ins
         "::mlir::Type":$elementType,
-        "ssize_t":$numX, "ssize_t":$numY, "ssize_t":$numZ, "TensorRepresentation":$representation
+        "ssize_t":$rank, ArrayRefType:$tensorShape, "TensorRepresentation":$representation
     );
     let genVerifyDecl = 1;
     // NOTE: float needs special treatment for equality check and hashing (epsilon)
@@ -231,7 +235,7 @@ def Tensor : Daphne_Type<"Tensor"> {
         // Creates a TensorType from mere element type information, with all
         // other parameters reset.
         TypeBuilder<(ins "::mlir::Type":$elementType), [{
-            return Base::get($_ctxt, elementType, -1, -1, -1, TensorRepresentation::Contiguous);
+            return Base::get($_ctxt, elementType, -1, {}, TensorRepresentation::Contiguous);
         }]>,
     ];
 
@@ -241,20 +245,26 @@ def Tensor : Daphne_Type<"Tensor"> {
         // new value.
 
         ssize_t getNumDim() const;
+        ssize_t getSizeOfDim(ssize_t dim_id) const;
 
         ::mlir::daphne::TensorType withElementType(::mlir::Type elementType) {
-            return get(getContext(), elementType, getNumX(), getNumY(), getNumZ(), getRepresentation());
+            return get(getContext(), elementType, getRank(), getTensorShape(), getRepresentation());
         }
 
-        ::mlir::daphne::TensorType withShape(ssize_t numX, ssize_t numY, ssize_t numZ) {
-            return get(getContext(), getElementType(), numX, numY, numZ, getRepresentation());
+        ::mlir::daphne::TensorType withShape(ArrayRef<ssize_t> tensorShape) {
+            return get(getContext(), getElementType(), getRank(), tensorShape, getRepresentation());
+        }
+
+        // TODO remove on shape inf rework
+        ::mlir::daphne::TensorType withShapeOLD(size_t numX, size_t) {
+            return get(getContext(), getElementType(), getRank(), tensorShape, getRepresentation());
         }
 
         ::mlir::daphne::TensorType withRepresentation(::mlir::daphne::TensorRepresentation rep) {
-            return get(getContext(), getElementType(), getNumX(), getNumY(), getNumZ(), rep);
+            return get(getContext(), getElementType(), getRank(), getTensorShape(), rep);
         }
 
-        // The following methods return a TensorType preserving the specified
+        // The following methods return a TensorType preserving the specstfied
         // properties and resetting all others.
 
         ::mlir::daphne::TensorType withSameElementType() {
@@ -262,12 +272,12 @@ def Tensor : Daphne_Type<"Tensor"> {
         }
 
         ::mlir::daphne::TensorType withSameElementTypeAndRepr() {
-            return get(getContext(), getElementType(), -1, -1, -1, getRepresentation());
+            return get(getContext(), getElementType(), -1, nullptr, getRepresentation());
         }
 
         /**
-         * @brief Check if `other` has strictly less information than this matrix type.
-         * @param other the other matrix type to compare to
+         * @brief Check if `other` has strictly less information than this tensor type.
+         * @param other the other tensor type to compare to
          * @return true if this type has more information, false otherwise
          */
         bool isSpecializationOf(::mlir::daphne::TensorType other) {
@@ -277,6 +287,17 @@ def Tensor : Daphne_Type<"Tensor"> {
         }
     }];
 }
+
+// Apparent name collsion -> not just TensorOf
+class DaphneTensorOf<list<Type> allowedTypes> : AnyTypeOf<[
+        ContainerType<
+                AnyTypeOf<!listconcat(allowedTypes, [Unknown])>,
+                Tensor.predicate,
+                "$_self.dyn_cast<::mlir::daphne::TensorType>().getElementType()",
+                "tensor"
+        >,
+        Unknown
+]>;
 
 def MatrixOrFrame : AnyTypeOf<[Matrix, Frame, Unknown]>;
 def MatrixOrFrameOrTensor : AnyTypeOf<[Matrix, Frame, Tensor, Unknown]>;

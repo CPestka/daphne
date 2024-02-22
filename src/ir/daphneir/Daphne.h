@@ -19,6 +19,7 @@
 
 // The following includes are required by...
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/ArrayRef.h"
 
 // TODO Get rid of this workaround by removing the pragmas and the include within
 //      (note that this header is also included transitively by FuncOps.h),

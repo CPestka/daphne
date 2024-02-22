@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "llvm/ADT/ArrayRef.h"
+
 #include <ir/daphneir/Daphne.h>
 
 #include <mlir/IR/Operation.h>

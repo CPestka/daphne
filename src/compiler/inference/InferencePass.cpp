@@ -211,14 +211,12 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                                 );
                         }
                         else if(op->getResultTypes()[i].isa<mlir::daphne::TensorType>()) {
-                            const ssize_t numX = (shapes[i])[0];
-                            const ssize_t numY = (shapes[i])[1];
-                            const ssize_t numZ = (shapes[i])[2];
                             Value rv = op->getResult(i);
                             const Type rt = rv.getType();
                             if (auto tt = rt.dyn_cast<daphne::TensorType>()) {
                                 // ToDo(fixme): currently, the shape can only be inferred for up to two dimensions!
-                                rv.setType(tt.withShape(numX, numY, numZ));
+                                // TODO: move entire shape inference to ND
+                                rv.setType(tt.withShape(shapes[i]));
                             }
                         }
                     }
@@ -525,7 +523,7 @@ public:
             if(auto ft = rt.dyn_cast<daphne::FrameType>())
                 return ft.getNumRows() == -1 || ft.getNumCols() == -1;
             if (auto tt = rt.dyn_cast<daphne::TensorType>())
-                return tt.getNumX() == -1 || tt.getNumY() == -1 || tt.getNumZ() == -1;
+                return tt.getTensorShape() == nullptr;
             return false;
         });
     }

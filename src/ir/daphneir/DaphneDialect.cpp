@@ -56,6 +56,7 @@
 #include <llvm/ADT/APInt.h>
 #include <llvm/ADT/APSInt.h>
 #include <llvm/ADT/DenseMap.h>
+#include "llvm/ADT/ArrayRef.h"
 
 #include <spdlog/spdlog.h>
 
@@ -264,11 +265,15 @@ void mlir::daphne::DaphneDialect::printType(mlir::Type type, mlir::DialectAsmPri
             os << '?';
         os << '>';
     } else if (auto t = type.dyn_cast<mlir::daphne::TensorType>()) {
-        os << "Tensor<" << unknownStrIf(t.getNumX()) << 'x' << unknownStrIf(t.getNumY()) << 'x'
-           << unknownStrIf(t.getNumZ()) << 'x' << t.getElementType();
-        os << '>';
-        // spdlog::trace("printing Tensor type: {}:{}:{}", unknownStrIf(t.getNumX()), unknownStrIf(t.getNumY()),
-        // unknownStrIf(t.getNumZ()));
+        os << "Tensor<";
+        ssize_t rank = t.getRank();
+        for(ssize_t i=0; i<rank; i++) {
+            if (i== rank-1) {
+                os << unkownStrIf(t.getTensorShape[i]) << ">";
+            } else {
+                os << unkownStrIf(t.getTensorShape[i]) << "x";
+            }
+        }
     } else if (auto handle = type.dyn_cast<mlir::daphne::HandleType>()) {
         os << "Handle<" << handle.getDataType() << ">";
     } else if (type.isa<mlir::daphne::StringType>())
@@ -388,24 +393,21 @@ namespace mlir::daphne {
     namespace detail {
         struct TensorTypeStorage : public ::mlir::TypeStorage {
             TensorTypeStorage(::mlir::Type elementType,
-                              ssize_t numX,
-                              ssize_t numY,
-                              ssize_t numZ,
+                              ssize_t rank,
+                              llvm::ArrayRef<ssize_t> tensorShape,
                               TensorRepresentation representation)
-                : elementType(elementType), numX(numX), numY(numY), numZ(numZ), representation(representation) {}
+                : elementType(elementType), rank(rank), tensorShape(tensorShape), representation(representation) {}
 
             /// The hash key is a tuple of the parameter types.
-            using KeyTy = std::tuple<::mlir::Type, ssize_t, ssize_t, ssize_t, TensorRepresentation>;
+            using KeyTy = std::tuple<::mlir::Type, ssize_t, llvm::ArrayRef<ssize_t>, TensorRepresentation>;
             bool operator==(const KeyTy &tblgenKey) const {
                 if (!(elementType == std::get<0>(tblgenKey)))
                     return false;
-                if (numX != std::get<1>(tblgenKey))
+                if (rank != std::get<1>(tblgenKey))
                     return false;
-                if (numY != std::get<2>(tblgenKey))
+                if(tensorShape != std::get<2>(tblgenKey))
                     return false;
-                if(numZ != std::get<3>(tblgenKey))
-                    return false;
-                if(representation != std::get<4>(tblgenKey))
+                if(representation != std::get<3>(tblgenKey))
                     return false;
                 return true;
             }
@@ -413,34 +415,31 @@ namespace mlir::daphne {
                 return ::llvm::hash_combine(std::get<0>(tblgenKey),
                     std::get<1>(tblgenKey),
                     std::get<2>(tblgenKey),
-                    std::get<3>(tblgenKey),
-                    std::get<4>(tblgenKey));
+                    std::get<3>(tblgenKey));
             }
 
             /// Define a construction method for creating a new instance of this
             /// storage.
             static TensorTypeStorage *construct(::mlir::TypeStorageAllocator &allocator, const KeyTy &tblgenKey) {
                 auto elementType = std::get<0>(tblgenKey);
-                auto numX = std::get<1>(tblgenKey);
-                auto numY = std::get<2>(tblgenKey);
-                auto numZ = std::get<3>(tblgenKey);
-                auto representation = std::get<4>(tblgenKey);
+                auto rank = std::get<1>(tblgenKey);
+                auto tensorShape = std::get<2>(tblgenKey);
+                auto representation = std::get<3>(tblgenKey);
                 return new(allocator.allocate<TensorTypeStorage>())
-                    TensorTypeStorage(elementType, numX, numY, numZ, representation);
+                    TensorTypeStorage(elementType, rank, tensorShape, representation);
             }
             ::mlir::Type elementType;
-            ssize_t numX;
-            ssize_t numY;
-            ssize_t numZ;
+            ssize_t rank;
             TensorRepresentation representation;
+            llvm::ArrayRef<ssize_t> tensorShape;
         };
     }
     ::mlir::Type TensorType::getElementType() const { return getImpl()->elementType; }
-    ssize_t TensorType::getNumX() const { return getImpl()->numX; }
-    ssize_t TensorType::getNumY() const { return getImpl()->numY; }
-    ssize_t TensorType::getNumZ() const { return getImpl()->numZ; }
+    ssize_t TensorType::getRank() const { return getImpl()->rank; }
+    llvm::ArrayRef<ssize_t> TensorType::getTensorShape() const { return getImpl()->tensorShape; }
     TensorRepresentation TensorType::getRepresentation() const { return getImpl()->representation; }
-    ssize_t TensorType::getNumDim() const { return 3; }
+
+    ssize_t TensorType::getNumDim() const { return getImpl()->rank; }
 }
 
 mlir::OpFoldResult mlir::daphne::ConstantOp::fold(FoldAdaptor adaptor) {
@@ -490,7 +489,7 @@ mlir::OpFoldResult mlir::daphne::ConstantOp::fold(FoldAdaptor adaptor) {
     return mlir::success();
 }
 
-::mlir::LogicalResult mlir::daphne::TensorType::verify(::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError, Type elementType, ssize_t numX, ssize_t numY, ssize_t numZ, TensorRepresentation representation)
+::mlir::LogicalResult mlir::daphne::TensorType::verify(::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError, Type elementType, ssize_t numX, ssize_t numY, ssize_t numZ, TensorRepresentation representation, std::vector<ssize_t> tensor_shape)
 {
     return mlir::success();
 }

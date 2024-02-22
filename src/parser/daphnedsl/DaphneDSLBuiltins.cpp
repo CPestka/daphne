@@ -320,6 +320,7 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
     // ********************************************************************
 
     if(func == "fill") {
+
         checkNumArgsExact(func, numArgs, 3);
         mlir::Value arg = args[0];
         mlir::Value numRows = utils.castSizeIf(args[1]);

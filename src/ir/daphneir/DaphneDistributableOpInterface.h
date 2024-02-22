@@ -17,6 +17,8 @@
 #ifndef SRC_IR_DAPHNEIR_DAPHNEDISTRIBUTABLEOPINTERFACE_H
 #define SRC_IR_DAPHNEIR_DAPHNEDISTRIBUTABLEOPINTERFACE_H
 
+#include "llvm/ADT/ArrayRef.h"
+
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/BuiltinTypes.h"
 

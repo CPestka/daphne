@@ -24,6 +24,7 @@
 #include <optional>
 #include <ostream>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 #include <runtime/local/datastructures/ContiguousTensor.h>
@@ -74,7 +75,7 @@ class ChunkedTensor : public Tensor<ValueType> {
             intra_chunk_strides[0] = 1;
         }
 
-        for(size_t i=0; i<this->rank; i++) {
+        for (size_t i = 0; i < this->rank; i++) {
             if ((tensor_shape[i] == 0) || chunk_shape[i] == 0) {
                 throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
             }
@@ -102,8 +103,8 @@ class ChunkedTensor : public Tensor<ValueType> {
         total_size_in_elements = total_chunk_count * chunk_element_count;
 
         // No C++20 sigh*
-        // data = std::make_shared<ValueType[]>(total_size_in_elements);
-        data = std::shared_ptr<ValueType[]>(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>());
+        data = std::make_shared<ValueType[]>(total_size_in_elements);
+        //data = std::shared_ptr<ValueType[]>(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>());
 
         chunk_materialization_flags = std::make_unique<std::atomic<bool>[]>(total_chunk_count);
         chunk_io_futures            = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
@@ -183,43 +184,58 @@ class ChunkedTensor : public Tensor<ValueType> {
           intra_chunk_strides(other->intra_chunk_strides), chunks_per_dim(other->chunks_per_dim),
           total_size_in_elements(other->total_size_in_elements), total_chunk_count(other->total_chunk_count),
           chunk_materialization_flags(std::make_unique<std::atomic<bool>[]>(total_chunk_count)) {
+        // And now the workaround broke -> complie error on eval of constexpr branch that is not supposed to be
+        // evaled...
+
+        // // workarround for of gcc with template specialization bug
+        // //https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85282
+        // if constexpr (std::is_same<ValueType, VTArg>::value) {
+        //     data = other->data;
+        // } else {
+        //     data(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>());
+        //     for(size_t i=0; i<total_size_in_elements; i++) {
+        //         data[i] = static_cast<ValueType>(other->data[i]);
+        //     }
+        // }
+        //data(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>());
         data = std::make_shared<ValueType[]>(total_size_in_elements);
+        for (size_t i = 0; i < total_size_in_elements; i++) {
+            data[i] = static_cast<ValueType>(other->data[i]);
+        }
+
         for (size_t i = 0; i < total_chunk_count; i++) {
             chunk_materialization_flags[i] = static_cast<bool>(other->chunk_materialization_flags[i]);
         }
         chunk_io_futures = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
-            chunk_io_futures[i].needs_byte_reversal = false;
-            chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
-        }
-        for(size_t i=0; i<total_size_in_elements; i++) {
-            data[i] = static_cast<ValueType>(other->data[i]);
+            chunk_io_futures[i].needs_byte_reversal = other->chunk_io_futures[i].needs_byte_reversal;
+            chunk_io_futures[i].status              = other->chunk_io_futures[i].status.load();
         }
     }
 
-    template<>
-    explicit ChunkedTensor(const ChunkedTensor<ValueType> *other)
-        : Tensor<ValueType>::Tensor(other->tensor_shape), chunk_shape(other->chunk_shape),
-          chunk_element_count(other->chunk_element_count), chunk_strides(other->chunk_strides),
-          intra_chunk_strides(other->intra_chunk_strides), chunks_per_dim(other->chunks_per_dim),
-          total_size_in_elements(other->total_size_in_elements), total_chunk_count(other->total_chunk_count),
-          chunk_materialization_flags(std::make_unique<std::atomic<bool>[]>(total_chunk_count)),
-          data(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>()) {
-        for (size_t i = 0; i < total_chunk_count; i++) {
-            chunk_materialization_flags[i] = static_cast<bool>(other->chunk_materialization_flags[i]);
-        }
-        chunk_io_futures = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
-        for (size_t i = 0; i < total_chunk_count; i++) {
-            chunk_io_futures[i].needs_byte_reversal = false;
-            chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
-        }
-        std::memcpy(data.get(), other->data.get(), total_size_in_elements * sizeof(ValueType));
-    }
+    // template<>
+    // explicit ChunkedTensor(const ChunkedTensor<ValueType> *other)
+    //     : Tensor<ValueType>::Tensor(other->tensor_shape), chunk_shape(other->chunk_shape),
+    //       chunk_element_count(other->chunk_element_count), chunk_strides(other->chunk_strides),
+    //       intra_chunk_strides(other->intra_chunk_strides), chunks_per_dim(other->chunks_per_dim),
+    //       total_size_in_elements(other->total_size_in_elements), total_chunk_count(other->total_chunk_count),
+    //       chunk_materialization_flags(std::make_unique<std::atomic<bool>[]>(total_chunk_count)),
+    //       data(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>()) {
+    //     for (size_t i = 0; i < total_chunk_count; i++) {
+    //         chunk_materialization_flags[i] = static_cast<bool>(other->chunk_materialization_flags[i]);
+    //     }
+    //     chunk_io_futures = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
+    //     for (size_t i = 0; i < total_chunk_count; i++) {
+    //         chunk_io_futures[i].needs_byte_reversal = false;
+    //         chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
+    //     }
+    //     std::memcpy(data.get(), other->data.get(), total_size_in_elements * sizeof(ValueType));
+    // }
 
     ChunkedTensor(const DenseMatrix<ValueType> *matrix, size_t chunk_size_x, size_t chunk_size_y)
         : Tensor<ValueType>::Tensor(matrix->getNumRows(), matrix->getNumCols()) {
-        for(size_t i=0; i<this->rank; i++) {
-            if ((this->tensor_shape[i] == 0) || chunk_shape[i] == 0)  {
+        for (size_t i = 0; i < this->rank; i++) {
+            if ((this->tensor_shape[i] == 0) || chunk_shape[i] == 0) {
                 throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
             }
         }
@@ -247,7 +263,7 @@ class ChunkedTensor : public Tensor<ValueType> {
         chunk_materialization_flags = std::make_unique<std::atomic<bool>[]>(total_chunk_count);
         chunk_io_futures            = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
-            chunk_materialization_flags[i] = true;
+            chunk_materialization_flags[i]          = true;
             chunk_io_futures[i].needs_byte_reversal = false;
             chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
         }
@@ -264,7 +280,7 @@ class ChunkedTensor : public Tensor<ValueType> {
             intra_chunk_strides[0] = 1;
         }
 
-        for(size_t i=0; i<this->rank; i++) {
+        for (size_t i = 0; i < this->rank; i++) {
             if ((this->tensor_shape[i] == 0) || chunk_shape[i] == 0) {
                 throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
             }
@@ -367,10 +383,10 @@ class ChunkedTensor : public Tensor<ValueType> {
         for (size_t i = 1; i < this->rank; i++) {
             chunk_id_strides[i] = (chunks_per_dim[i - 1] * chunk_id_strides[i - 1]);
         }
-        
+
         chunk_ids.resize(this->rank);
         for (int64_t i = this->rank - 1; i >= 0; i--) {
-            chunk_ids[i] = linear_chunk_id / chunk_id_strides[i];
+            chunk_ids[i]    = linear_chunk_id / chunk_id_strides[i];
             linear_chunk_id = linear_chunk_id % chunk_id_strides[i];
         }
 
@@ -434,7 +450,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     }
 
     // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
-    std::optional<std::vector<std::vector<size_t>>> GetChunkListFromIdRange (
+    std::optional<std::vector<std::vector<size_t>>> GetChunkListFromIdRange(
       std::vector<std::pair<size_t, size_t>> element_id_ranges) const {
         if (element_id_ranges.size() != this->rank) {
             return std::nullopt;
@@ -487,7 +503,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     }
 
     // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
-    std::optional<std::vector<std::vector<size_t>>> GetChunkListFromChunkRange (
+    std::optional<std::vector<std::vector<size_t>>> GetChunkListFromChunkRange(
       std::vector<std::pair<size_t, size_t>> chunk_id_ranges) const {
         if (chunk_id_ranges.size() != this->rank) {
             return std::nullopt;
@@ -550,7 +566,7 @@ class ChunkedTensor : public Tensor<ValueType> {
                 ReverseArray(getPtrToChunk(linear_chunk_id), chunk_element_count);
                 chunk_io_futures[linear_chunk_id].needs_byte_reversal = false;
             }
-            
+
             chunk_materialization_flags[linear_chunk_id] = true;
             return true;
         }
@@ -618,7 +634,7 @@ class ChunkedTensor : public Tensor<ValueType> {
         if (this->rank == 0) {
             return data.get();
         }
-        return &(data.get()[linear_chunk_id*chunk_element_count]);
+        return &(data.get()[linear_chunk_id * chunk_element_count]);
     }
 
     std::optional<std::unique_ptr<ValueType[]>> tryGetChunk(const std::vector<size_t> &chunk_indices) const {

@@ -210,8 +210,8 @@ class Daphne_EwUnaryOp<string name, Type scalarType, list<Trait> traits = []> : 
     CastArgsToResType,
     NoMemoryEffect
 ])> {
-    let arguments = (ins AnyTypeOf<[MatrixOf<[scalarType]>, scalarType, Unknown]>:$arg);
-    let results = (outs AnyTypeOf<[MatrixOf<[scalarType]>, scalarType, Unknown]>:$res);
+    let arguments = (ins AnyTypeOf<[MatrixOf<[scalarType]>, DaphneTensorOf<[scalarType]>, scalarType, Unknown]>:$arg);
+    let results = (outs AnyTypeOf<[MatrixOf<[scalarType]>, DaphneTensorOf<[scalarType]>, scalarType, Unknown]>:$res);
 }
 
 // ----------------------------------------------------------------------------
