@@ -75,7 +75,7 @@ private:
      * direct parent, and so on.
      * @return `true` if the symbol is found, `false` otherwise.
      */
-    bool has(const std::string & sym, int parent) {
+    bool has(const std::string & sym, int parent) const {
         for(int i = scopes.size() - 1 - parent; i >= 0; i--)
             if(scopes[i].count(sym))
                 return true;
@@ -97,7 +97,7 @@ public:
      * @param sym The symbol (variable name) to look for.
      * @return `true` if the symbol is found, `false` otherwise.
      */
-    bool has(const std::string & sym) {
+    bool has(const std::string & sym) const {
         return has(sym, 0);
     }
     
@@ -111,7 +111,7 @@ public:
      * @param sym The symbol (variable name) to look for.
      * @return Information on the symbol, including the associated SSA value.
      */
-    SymbolInfo get(const std::string & sym) {
+    SymbolInfo get(const std::string & sym) const {
         for(int i = scopes.size() - 1; i >= 0; i--) {
             auto it = scopes[i].find(sym);
             if(it != scopes[i].end())
@@ -129,11 +129,53 @@ public:
      * `ScopedSymbolTable`.
      * @return Information on the symbol, including the associated SSA value.
      */
-    SymbolInfo get(const std::string & sym, const SymbolTable & tab) {
+    SymbolInfo get(const std::string & sym, const SymbolTable & tab) const {
         auto it = tab.find(sym);
         if(it != tab.end())
             return it->second;
         return get(sym);
+    }
+    
+    /**
+     * @brief Returns the symbol (variable name) associated with the given SSA value,
+     * or throws an exception if the SSA value is unknown.
+     * 
+     * Starting at the current scope, all hierarchy levels are searched until
+     * the first occurrence of the SSA value is found.
+     * 
+     * Note that an SSA value can be known by more than one variable name, even in a
+     * single scope. This method simply returns the first name it finds.
+     * 
+     * @param val The SSA value to look for.
+     * @return The associated variable name.
+     */
+    std::string getSymbol(mlir::Value val) const {
+        for(int i = scopes.size() - 1; i >= 0; i--)
+            for(auto it = scopes[i].begin(); it != scopes[i].end(); it++)
+                if(it->second.value == val)
+                    return it->first;
+        throw std::runtime_error("no symbol found for the given value");
+    }
+
+    /**
+     * Like the other `getSymbol` method, but only tries to find the SSA value
+     * in the given single-level symbol table.
+     * 
+     * Note that an SSA value can be known by more than one variable name, even in a
+     * single scope. This method simply returns the first name it finds.
+     * 
+     * @param val The SSA value to look for.
+     * @param tab A single-level symbol table from outside of this
+     * `ScopedSymbolTable`.
+     * @return The associated variable name.
+     */
+    std::string getSymbol(mlir::Value val, const SymbolTable & tab) const {
+        for(auto it = tab.begin(); it != tab.end(); it++)
+            if(it->second.value == val)
+                return it->first;
+        // Unlike get(symbol, tab), we don't want to search in the scopes of
+        // this ScopedSymbolTable.
+        throw std::runtime_error("no symbol found for the given value");
     }
     
     /**
@@ -179,7 +221,7 @@ public:
      *
      * @return Number of nested scopes
      */
-    size_t getNumScopes() {
+    size_t getNumScopes() const {
         return scopes.size();
     }
 
@@ -217,7 +259,7 @@ public:
      * 
      * @param os The stream to print to. Could be `std::cout`.
      */
-    void dump(std::ostream & os) {
+    void dump(std::ostream & os) const {
         for(size_t i = 0; i < scopes.size(); i++) {
             os << "scope #" << i << ':' << std::endl;
             for(auto it = scopes[i].begin(); it != scopes[i].end(); it++)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 The DAPHNE Consortium
+ * Copyright 2024 The DAPHNE Consortium
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,12 @@
  * limitations under the License.
  */
 
-x = 1.0;
-y = 2.0;
+#pragma once
 
-m1 = rand(6000, 15000, 1.0, 1000.0, 1.0, 42);
-m2= rand(6000, 15000, 1.0, 1000.0, 1.0, 43);
-print("---------------");
-print("part of random matrix m1");
-print(m1[1:5,1:5]);
-print("part of random matrix m2");
-print(m2[1:5,1:5]);
+#include <runtime/local/context/DaphneContext.h>
 
-m3= m1 + m2;
-print("m3 = m1 + m2");
-print(m3[1:5,1:5]);
+#include <string_view>
 
-print("Hello world!");
-print("Bye!"); 
+inline void stringEq(bool *res, const char *lhs, const char *rhs, DCTX(ctx)) {
+    *res = std::string_view(lhs) == std::string_view(rhs);
+}

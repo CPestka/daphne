@@ -80,8 +80,9 @@ DaphneDSL's built-in functions can be categorized as follows:
   
 - **`seq`**`(from:scalar, to:scalar, inc:scalar)`
 
-    Generates a column matrix containing an arithmetic sequence of values starting at `from`, going through `to`, in increments of `inc`.
+    Generates a column *(n x 1)* matrix containing an arithmetic sequence of values starting at `from`, going through `to`, in increments of `inc`.
     Note that `from` may be greater than `to`, and `inc` may be negative.
+    If `inc` does not lead from `from` to `to`, the result will be an empty column matrix; however, `inc` must not be zero or NaN.
 
 ## Matrix/frame dimensions
 
@@ -115,8 +116,23 @@ The following built-in functions all follow the same scheme:
 | **`abs`** | absolute value |
 | **`sign`** | signum (`1` for positive, `0` for zero, `-1` for negative) |
 | **`exp`** | exponentiation (*e* to the power of `arg`) |
-| **`ln`** | natural logarithm (logarithm of `arg` to the base of *e*) *(not supported yet, see #614)* |
+| **`ln`** | natural logarithm (logarithm of `arg` to the base of *e*) |
 | **`sqrt`** | square root |
+
+### Trigonometric/Hyperbolic
+
+`arg` unit must be radians (conversion: $x^\circ * \frac{\pi}{180^\circ} = y$ radians)
+| function | meaning |
+| ----- | ----- |
+| **`sin`** | sine |
+| **`cos`** | cosine |
+| **`tan`** | tangent |
+| **`asin`** | arc sine  (inverse of sine) |
+| **`acos`** | arc cosine (inverse of cosine) |
+| **`atan`** | arc tangent (inverse of tangent) |
+| **`sinh`** | hyperbolic sine ($\frac{e^\text{arg}-e^\text{ - arg}}{2}$) |
+| **`cosh`** | hyperbolic cosine ($\frac{e^\text{arg}+e^\text{ - arg}}{2}$) |
+| **`tanh`** | hyperbolic tangent ($\frac{\text{sinh arg}}{\text{cosh arg}}$) |
 
 ### Rounding
 
@@ -125,11 +141,6 @@ The following built-in functions all follow the same scheme:
 | **`round`** | round to nearest |
 | **`floor`** | round down |
 | **`ceil`** | round up |
-
-### Trigonometric
-
-The typical trigonometric functions:
-**`sin`**, **`cos`**, **`tan`**, **`sinh`**, **`cosh`**, **`tanh`**, **`asin`**, **`acos`**, **`atan`** *(not supported yet, see #614)*
 
 ## Elementwise binary
 
@@ -544,6 +555,76 @@ These must be provided in a separate [`.meta`-file](/doc/FileMetaDataFormat.md).
 
         More precisely, the *j*-th column of `arg` must contain only integral values in the range *[0, d[j] - 1]*, and will be replaced by *d[j]* columns containing only zeros and ones.
         For each row *i* in `arg`, the value in the `as.scalar(arg[i, j])`-th of those columns is set to 1, while all others are set to 0.
+
+- **`recode`**`(arg:matrix, orderPreserving:bool)`
+
+    Applies dictionary encoding to the given *(n x 1)* matrix `arg`, i.e., assigns an integral code to each distinct value in `arg`.
+    The codes start at *0*.
+    Iff the parameter `orderPreserving` is `true`, then the distinct values are sorted in ascending order before assigning codes.
+    That way, range predicates are possible on the encoded output.
+    Otherwise, new codes are assigned to distinct values are they are encountered.
+    That way, only point predicates are possible on the encoded output.
+
+    There are two results:
+    - The first result is the encoded data, a *(n x 1)* matrix of the codes for each element in the input `arg`.
+    - The second result is the decoding dictionary, a *(#distinct(`arg`) x 1)* matrix of the distinct values in `arg`.
+        The value at position *i* is the value that is mapped to the code *i*.
+
+    The encoded data can be decoded by right indexing on the dictionary using the codes as positions.
+
+    Example:
+
+    ```
+    data = [10, 5, 20, 5, 20];
+    codes, dict = recode(data, false);
+    print(codes);
+    print(dict);
+    decoded = dict[codes, ];
+    print(decoded);
+    ```
+
+    ```
+    DenseMatrix(5x1, int64_t)
+    0
+    1
+    2
+    1
+    2
+    DenseMatrix(3x1, int64_t)
+    10
+    5
+    20
+    DenseMatrix(5x1, int64_t)
+    10
+    5
+    20
+    5
+    20
+    ```
+
+- **`bin`**`(arg:matrix, numBins:size[, min:scalar, max:scalar])`
+
+    Applies binning to the given matrix `arg`, i.e., each value is mapped to the number of its bin (counting starts at zero).
+    The bin boundaries are determined by splitting the interval *[`min`, `max`]* into `numBins` equi-width bins.
+    The number of bins `numBins` is required.
+    Specifying `min` and `max` is optional; if they are omitted, they are automatically calculated, whereby NaNs in `arg` are not taken into account.
+
+    Example:
+
+    ```
+    print(bin(t([10, 20, 30, 40, 50, 60, 70]), 3));
+    print(bin(t([10, 20, 30, 40, 50, 60, 70]), 3, 10, 70));
+    print(bin(t([5.0, 20.0, nan, 40.0, inf, 60.0, 100.0]), 3, 10.0, 70.0));
+    ```
+
+    ```
+    DenseMatrix(1x7, int64_t)
+    0 0 0 1 1 2 2
+    DenseMatrix(1x7, int64_t)
+    0 0 0 1 1 2 2
+    DenseMatrix(1x7, double)
+    0 0 nan 1 2 2 2
+    ```
 
 ## Measurements
 

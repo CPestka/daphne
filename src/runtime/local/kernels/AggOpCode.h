@@ -33,6 +33,7 @@ enum class AggOpCode {
     IDXMAX,
     MEAN,
     STDDEV,
+    VAR,
 };
 
 struct AggOpCodeUtils {
@@ -47,8 +48,12 @@ struct AggOpCodeUtils {
                 return true;
             case AggOpCode::MEAN:
             case AggOpCode::STDDEV:
+            case AggOpCode::VAR:
                 return false;
         }
+        // unreachable; return to silence gcc warning, as apparently it doesnt understand fall through
+        throw std::runtime_error("unreachable");
+        return false;
     }
     
     static BinaryOpCode getBinaryOpCode(AggOpCode opCode) {
@@ -85,6 +90,7 @@ struct AggOpCodeUtils {
             case AggOpCode::MAX:
             case AggOpCode::MEAN:
             case AggOpCode::STDDEV:
+            case AggOpCode::VAR:
                 return false;
             default:
                 throw std::runtime_error("unsupported AggOpCode");

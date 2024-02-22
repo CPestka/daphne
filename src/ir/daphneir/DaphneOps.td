@@ -336,6 +336,12 @@ def Daphne_ConcatOp : Daphne_Op<"concat", [DataTypeSca, ValueTypeStr]> {
     let hasFolder = 1;
 }
 
+def Daphne_StringEqOp : Daphne_Op<"stringEq", [ValueTypeStr]> {
+    let arguments = (ins StrScalar:$lhs, StrScalar:$rhs);
+    let results = (outs BoolScalar:$res);
+    let hasFolder = 1;
+}
+
 // ----------------------------------------------------------------------------
 // Comparisons
 // ----------------------------------------------------------------------------
@@ -347,7 +353,9 @@ class Daphne_EwCmpOp<string name, Type inputScalarType, list<Trait> traits = []>
     //let results = (outs AnyTypeOf<[MatrixOf<[BoolScalar]>, BoolScalar, Unknown]>:$res);
 }
 
-def Daphne_EwEqOp  : Daphne_EwCmpOp<"ewEq" , AnyScalar, [Commutative]>;
+def Daphne_EwEqOp  : Daphne_EwCmpOp<"ewEq" , AnyScalar, [Commutative]> {
+    let hasCanonicalizeMethod = 1;
+}
 def Daphne_EwNeqOp : Daphne_EwCmpOp<"ewNeq", AnyScalar, [Commutative, CUDASupport]>;
 def Daphne_EwLtOp  : Daphne_EwCmpOp<"ewLt" , AnyScalar>;
 def Daphne_EwLeOp  : Daphne_EwCmpOp<"ewLe" , AnyScalar>;
@@ -633,7 +641,7 @@ def Daphne_ExtractColOp : Daphne_Op<"extractCol", [
     DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
     DeclareOpInterfaceMethods<InferTypesOpInterface>,
     DeclareOpInterfaceMethods<VectorizableOpInterface>,
-    NumRowsFromArg, NumColsFromIthArgNumRows<1>, CUDASupport
+    DeclareOpInterfaceMethods<InferShapeOpInterface>, CUDASupport
 ]> {
     let summary = "Copies the specified columns from the argument to the result.";
 
@@ -677,7 +685,7 @@ def Daphne_InsertRowOp : Daphne_Op<"insertRow", [
     TypeFromFirstArg, // this is debatable
     ShapeFromArg
 ]> {
-    let arguments = (ins MatrixOrFrame:$arg, MatrixOrFrame:$ins, Size:$rowLowerIncl, Size:$rowUpperExcl);
+    let arguments = (ins MatrixOrFrame:$arg, MatrixOrFrame:$ins, SI64:$rowLowerIncl, SI64:$rowUpperExcl);
     let results = (outs MatrixOrFrame:$res);
 }
 
@@ -685,7 +693,7 @@ def Daphne_InsertColOp : Daphne_Op<"insertCol", [
     TypeFromFirstArg, // this is debatable
     ShapeFromArg
 ]> {
-    let arguments = (ins MatrixOrFrame:$arg, MatrixOrFrame:$ins, Size:$colLowerIncl, Size:$colUpperExcl);
+    let arguments = (ins MatrixOrFrame:$arg, MatrixOrFrame:$ins, SI64:$colLowerIncl, SI64:$colUpperExcl);
     let results = (outs MatrixOrFrame:$res);
 }
 
@@ -1428,6 +1436,22 @@ def Daphne_OneHotOp : Daphne_Op<"oneHot", [
     NumRowsFromArg, // DeclareOpInterfaceMethods<InferNumColsOpInterface>
 ]> {
     let arguments = (ins MatrixOrFrame:$arg, MatrixOf<[SI64]>:$info);
+    let results = (outs MatrixOrFrame:$res);
+}
+
+def Daphne_RecodeOp : Daphne_Op<"recode", [
+    DeclareOpInterfaceMethods<InferTypesOpInterface>,
+    DeclareOpInterfaceMethods<InferShapeOpInterface>
+]> {
+    let arguments = (ins MatrixOrFrame:$arg, BoolScalar:$orderPreserving);
+    let results = (outs MatrixOrFrame:$res, MatrixOrFrame:$dict);
+}
+
+def Daphne_BinOp : Daphne_Op<"bin", [
+    TypeFromFirstArg,
+    ShapeFromArg
+]> {
+    let arguments = (ins MatrixOrFrame:$arg, NumScalar:$numBins, NumScalar:$min, NumScalar:$max);
     let results = (outs MatrixOrFrame:$res);
 }
 

@@ -147,6 +147,9 @@ class CSRMatrix : public Matrix<ValueType> {
     }
     
 public:
+
+    template<typename NewValueType>
+    using WithValueType = CSRMatrix<NewValueType>;
     
     void shrinkNumRows(size_t numRows) {
         assert((numRows <= this->numRows) && "numRows can only the shrinked");
@@ -383,10 +386,12 @@ public:
     }
 
     CSRMatrix* sliceCol(size_t cl, size_t cu) const override {
+        // TODO add boundary validation when implementing
         throw std::runtime_error("CSRMatrix does not support sliceCol yet");
     }
 
     CSRMatrix* slice(size_t rl, size_t ru, size_t cl, size_t cu) const override {
+        // TODO add boundary validation when implementing
         throw std::runtime_error("CSRMatrix does not support slice yet");
     }
 

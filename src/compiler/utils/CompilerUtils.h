@@ -166,25 +166,25 @@ public:
                     return "ContiguousTensor_" + mlirTypeToCppTypeName(tensTy.getElementType(), false);
             }
         }
-        else if(t.isa<mlir::daphne::FrameType>())
+        else if(llvm::isa<mlir::daphne::FrameType>(t))
             if(generalizeToStructure)
                 return "Structure";
             else
                 return "Frame";
-        else if(t.isa<mlir::daphne::StringType>())
+        else if(llvm::isa<mlir::daphne::StringType>(t))
             // This becomes "const char *" (which makes perfect sense for
             // strings) when inserted into the typical "const DT *" template of
             // kernel input parameters.
             return "char";
-        else if(t.isa<mlir::daphne::DaphneContextType>())
+        else if(llvm::isa<mlir::daphne::DaphneContextType>(t))
             return "DaphneContext";
         else if(auto handleTy = t.dyn_cast<mlir::daphne::HandleType>())
             return "Handle_" + mlirTypeToCppTypeName(handleTy.getDataType(), generalizeToStructure);
-        else if(t.isa<mlir::daphne::FileType>())
+        else if(llvm::isa<mlir::daphne::FileType>(t))
             return "File";
-        else if(t.isa<mlir::daphne::DescriptorType>())
+        else if(llvm::isa<mlir::daphne::DescriptorType>(t))
             return "Descriptor";
-        else if(t.isa<mlir::daphne::TargetType>())
+        else if(llvm::isa<mlir::daphne::TargetType>(t))
             return "Target";
         else if(auto memRefType = t.dyn_cast<mlir::MemRefType>()) {
             return "StridedMemRefType_" + mlirTypeToCppTypeName(memRefType.getElementType(), false) + "_2";
@@ -227,7 +227,7 @@ public:
     }
     
     [[maybe_unused]] static bool isObjType(mlir::Type t) {
-        return t.isa<mlir::daphne::MatrixType, mlir::daphne::FrameType, mlir::daphne::TensorType>();
+        return llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType, mlir::daphne::TensorType>(t);
     }
     
     [[maybe_unused]] static bool hasObjType(mlir::Value v) {
@@ -270,6 +270,70 @@ public:
             throw std::runtime_error("setValueType() doesn't support frames yet"); // TODO
         else // TODO Check if this is really a scalar.
             return vt;
+    }
+
+    /**
+     * @brief Checks if the two given types are the same, whereby
+     * DaphneIR's unknown type acts as a wildcard.
+     * 
+     * The two types are considered equal, iff they are exactly the same
+     * type, or one of the following "excuses" holds:
+     * - at least one of the types is unknown
+     * - both types are matrices and at least one of them has an unknown
+     *   value type
+     * 
+     * @param t1 The first type
+     * @param t2 The second type
+     * @result `true` if the two types are considered equal, `false` otherwise
+     */
+    static bool equalUnknownAware(mlir::Type t1, mlir::Type t2) {
+        using mlir::daphne::UnknownType;
+        auto matT1 = t1.dyn_cast<mlir::daphne::MatrixType>();
+        auto matT2 = t2.dyn_cast<mlir::daphne::MatrixType>();
+        // The two given types are considered equal, iff:
+        return (
+            // The two types are exactly the same...
+            t1 == t2
+            // ...or one of the following "excuses" holds:
+            || (
+                // at least one of the types is unknown
+                llvm::isa<UnknownType>(t1) || llvm::isa<UnknownType>(t2) ||
+                // both types are matrices and at least one of them
+                // has an unknown value type
+                (matT1 && matT2 && (
+                    llvm::isa<UnknownType>(matT1.getElementType()) ||
+                    llvm::isa<UnknownType>(matT2.getElementType())
+                ))
+            )
+        );
+    }
+
+    /**
+     * @brief Creates an exception with a message that contains the given location (in
+     * a uniformly formatted way) and the given message.
+     * 
+     * This function should be used for consistent error message formatting.
+     * 
+     * @param loc The location information
+     * @param msg The original error message (without the location information)
+     * @return An exception instance to be thrown at the call-site
+     */
+    static std::runtime_error makeError(mlir::Location loc, const std::string & msg) {
+        // Note: We return an exception rather than throwing it here for the following reason:
+        // If this function threw the exception, we would use this function like a replacement
+        // for a C++ throw statement. However, that would be hard to understand for the C++
+        // compiler in some cases. For instance, assume a function f() with non-void return value
+        // contains only an if-then-else statement, whose then-branch returns a value and
+        // whose else-branch throws an exception. The C++ compiler could complain about
+        // reaching the end of control flow without a return or throw statement in f().
+        // By returning the exception, the caller can simply throw it as in `throw makeError(...);`,
+        // and that will look fine for the C++ compiler.
+
+        // TODO Support different sub-classes of Location.
+        auto flcLoc = loc.dyn_cast<mlir::FileLineColLoc>();
+        std::stringstream s;
+        s << flcLoc.getFilename().str() << ':' << flcLoc.getLine() << ':' << flcLoc.getColumn() << ' ' << msg;
+        return std::runtime_error(s.str());
     }
 
 };

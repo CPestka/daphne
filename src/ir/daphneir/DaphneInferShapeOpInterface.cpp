@@ -185,8 +185,36 @@ std::vector<std::vector<ssize_t>> daphne::GroupJoinOp::inferShape() {
 
 std::vector<std::vector<ssize_t>> daphne::GroupOp::inferShape() {
     // We don't know the exact number of groups here.
+
+    std::vector<std::string> newLabels;
+
+    for(Value t: getKeyCol()){ //Adopting keyCol Labels
+        std::string keyLabel = CompilerUtils::constantOrThrow<std::string>(t);
+        std::string delimiter = ".";
+        const std::string frameName = keyLabel.substr(0, keyLabel.find(delimiter));
+        const std::string colLabel = keyLabel.substr(keyLabel.find(delimiter) + delimiter.length(), keyLabel.length());
+        
+        if(keyLabel == "*") {
+            daphne::FrameType arg = getFrame().getType().dyn_cast<daphne::FrameType>();
+            for (std::string frameLabel : *arg.getLabels()) {
+                newLabels.push_back(frameLabel);
+            }
+        } else if(colLabel.compare("*") == 0) {
+            daphne::FrameType arg = getFrame().getType().dyn_cast<daphne::FrameType>();
+            std::vector<std::string> labels = *arg.getLabels();
+            for (std::string label : labels) {
+                std::string labelFrameName = label.substr(0, label.find(delimiter));
+                if (labelFrameName.compare(frameName) == 0) {
+                    newLabels.push_back(label);
+                }
+            }
+        } else {
+            newLabels.push_back(keyLabel);
+        }
+    }
+    
+    const ssize_t numCols = newLabels.size() + getAggCol().size();
     const ssize_t numRows = -1;
-    const ssize_t numCols = getKeyCol().size() + getAggCol().size();
     return {{numRows, numCols}};
 }
 
@@ -287,7 +315,7 @@ std::vector<std::vector<ssize_t>> daphne::OrderOp::inferShape() {
 
 std::vector<std::vector<ssize_t>> daphne::CondOp::inferShape() {
     Type condTy = getCond().getType();
-    if(condTy.isa<daphne::UnknownType>())
+    if(llvm::isa<daphne::UnknownType>(condTy))
         // Actually, this should not happen, because if the type of the
         // condition is unknown, the type of the result should be unknown
         // too per type inference, such that shape inference should not
@@ -361,7 +389,11 @@ std::vector<std::vector<ssize_t>> daphne::SliceRowOp::inferShape() {
     Type srcTy = getSource().getType();
     ssize_t srcNumRows;
     ssize_t srcNumCols;
-    if(auto srcMatTy = srcTy.dyn_cast<daphne::MatrixType>()) {
+    if(llvm::isa<daphne::UnknownType>(srcTy)) {
+        srcNumRows = -1;
+        srcNumCols = -1;
+    }
+    else if(auto srcMatTy = srcTy.dyn_cast<daphne::MatrixType>()) {
         srcNumRows = srcMatTy.getNumRows();
         srcNumCols = srcMatTy.getNumCols();
     }
@@ -375,7 +407,7 @@ std::vector<std::vector<ssize_t>> daphne::SliceRowOp::inferShape() {
     }
     else {
         // If this is the case, shape inference shouldn't have been called.
-        throw std::runtime_error("SliceRowOp shape inference does only support matrix, frame, and tensor inputs");
+        throw std::runtime_error("SliceRowOp shape inference does only support unknown, matrix,, frame, and tensor inputs");
     }
 
     auto loIn = CompilerUtils::isConstant<int64_t>(getLowerIncl());
@@ -438,19 +470,22 @@ std::vector<std::vector<ssize_t>> daphne::SliceColOp::inferShape() {
         ssize_t loInPos = loIn.second;
         ssize_t upExPos = upEx.second;
         if(loInPos < 0 || loInPos >= srcNumCols)
-            throw std::runtime_error(
+            throw CompilerUtils::makeError(
+                getLoc(),
                 "SliceColOp shape inference: lowerIncl must be in [0, numCols), "
                 "but is " + std::to_string(loInPos) +
                 " with " + std::to_string(srcNumCols) + " cols"
             );
         if(upExPos < 0 || upExPos > srcNumCols)
-            throw std::runtime_error(
+            throw CompilerUtils::makeError(
+                getLoc(),
                 "SliceColOp shape inference: upperExcl must be in [0, numCols], "
                 "but is " + std::to_string(upExPos) +
                 " with " + std::to_string(srcNumCols) + " cols"
             );
         if(loInPos > upExPos)
-            throw std::runtime_error(
+            throw CompilerUtils::makeError(
+                getLoc(),
                 "SliceColOp shape inference: lowerIncl must not be greater than upperExcl"
                 " (found " + std::to_string(loInPos) + " and " + std::to_string(upExPos) + ")"
             );
@@ -460,12 +495,71 @@ std::vector<std::vector<ssize_t>> daphne::SliceColOp::inferShape() {
     return {{srcNumRows, resNumCols}};
 }
 
+std::vector<std::vector<ssize_t>> daphne::ExtractColOp::inferShape() {
+    auto ft = getSource().getType().dyn_cast<daphne::FrameType>();
+    auto srcNumRows = getShape(getOperand(0)).first;
+    auto st = getSelectedCols().getType().dyn_cast<daphne::StringType>();
+    
+    if(ft && st) {
+        std::string label = CompilerUtils::constantOrThrow<std::string>(getSelectedCols());
+        std::string delimiter = ".";
+        const std::string frameName = label.substr(0, label.find(delimiter));
+        const std::string colLabel = label.substr(label.find(delimiter) + delimiter.length(), label.length());
+        if (colLabel.compare("*") == 0) {
+            std::vector<std::string> labels = *ft.getLabels();
+            ssize_t numCols = 0;
+            for (size_t i = 0; i < labels.size(); i++) {
+                std::string labelFrameName = labels[i].substr(0, labels[i].find(delimiter));
+                if (labelFrameName.compare(frameName) == 0) {
+                    numCols++;
+                }
+            }
+            return {{srcNumRows, numCols}};
+        }
+    }
+    // Default case except when the selectedCols ends in a wildcard
+    return{{srcNumRows, getShape(getOperand(1)).second}};
+}
+
 std::vector<std::vector<ssize_t>> daphne::SliceTensorOp::inferShape() {
+    return {}; // TODO
 }
 
 std::vector<std::vector<ssize_t>> daphne::EigenOp::inferShape() {
     auto shape = getShape(getOperand());
     return {{shape.first, 1}, {shape.first, shape.first}};
+}
+
+std::vector<std::vector<ssize_t>> daphne::RecodeOp::inferShape() {
+    // Intuition:
+    // - The (data) result has the same shape as the argument.
+    // - The (dict) result has an unknown number of rows and one column.
+
+    Type argTy = getArg().getType();
+
+    ssize_t resNumRows;
+    ssize_t resNumCols;
+    if(auto argMatTy = llvm::dyn_cast<daphne::MatrixType>(argTy)) {
+        resNumRows = argMatTy.getNumRows();
+        resNumCols = argMatTy.getNumCols();
+    }
+    else if(auto argFrmTy = llvm::dyn_cast<daphne::FrameType>(argTy)) {
+        resNumRows = argFrmTy.getNumRows();
+        resNumCols = argFrmTy.getNumCols();
+    }
+    else if(llvm::isa<daphne::UnknownType>(argTy)) {
+        resNumRows = -1;
+        resNumCols = -1;
+    }
+    else
+        throw std::runtime_error("the argument to recode has an invalid type");
+
+    // TODO We could infer (or estimate) the number of rows of the dictionary result
+    // if we knew the number of distinct values in the argument (or could estimate it).
+    const ssize_t dictNumRows = -1;
+    const ssize_t dictNumCols = 1;
+
+    return {{resNumRows, resNumCols}, {dictNumRows, dictNumCols}};
 }
 
 // ****************************************************************************

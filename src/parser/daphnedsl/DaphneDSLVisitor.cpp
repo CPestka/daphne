@@ -15,6 +15,7 @@
  */
 
 #include <compiler/utils/CompilerUtils.h>
+#include <compiler/utils/TypePrinting.h>
 #include <ir/daphneir/Daphne.h>
 #include <parser/daphnedsl/DaphneDSLVisitor.h>
 #include <parser/daphnedsl/DaphneDSLParser.h>
@@ -80,7 +81,7 @@ void DaphneDSLVisitor::handleAssignmentPart(
             rowSeg = applyLeftIndexing<
                     mlir::daphne::InsertColOp,
                     mlir::daphne::NumColsOp
-            >(utils.getLoc(idxCtx->start), rowSeg, val, cols.second, obj.getType().isa<mlir::daphne::FrameType>());
+            >(utils.getLoc(idxCtx->start), rowSeg, val, cols.second, llvm::isa<mlir::daphne::FrameType>(obj.getType()));
             obj = applyLeftIndexing<
                     mlir::daphne::InsertRowOp,
                     mlir::daphne::NumRowsOp
@@ -95,7 +96,7 @@ void DaphneDSLVisitor::handleAssignmentPart(
             obj = applyLeftIndexing<
                     mlir::daphne::InsertColOp,
                     mlir::daphne::NumColsOp
-            >(utils.getLoc(idxCtx->start), obj, val, cols.second, obj.getType().isa<mlir::daphne::FrameType>());
+            >(utils.getLoc(idxCtx->start), obj, val, cols.second, llvm::isa<mlir::daphne::FrameType>(obj.getType()));
         else
             obj = val;
 
@@ -111,12 +112,11 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
     if(ax.is<mlir::Value>()) { // indexing with a single SSA value (no ':')
         //std::cout << "indexing with a single SSA value (no ':')" << std::endl;
         mlir::Value axVal = ax.as<mlir::Value>();
-        // data object
-        if(CompilerUtils::hasObjType(axVal)) {
-            //std::cout << "CompilerUtils::hasObjType(axVal)" << std::endl;
-            return utils.retValWithInferedType(builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal));
-        }
-        else if(axVal.getType().isa<mlir::daphne::StringType>()) { // string
+        if(CompilerUtils::hasObjType(axVal)) // data object
+            return utils.retValWithInferedType(
+                    builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal)
+            );
+        else if(llvm::isa<mlir::daphne::StringType>(axVal.getType())) { // string
             if(allowLabel)
                 return utils.retValWithInferedType(
                         builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal)
@@ -132,8 +132,8 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
             return utils.retValWithInferedType(
                     builder.create<SliceAxOp>(
                             loc, utils.unknownType, arg,
-                            utils.castSizeIf(axVal),
-                            utils.castSizeIf(
+                            utils.castSI64If(axVal),
+                            utils.castSI64If(
                                     builder.create<mlir::daphne::EwAddOp>(
                                             loc, builder.getIntegerType(64, false),
                                             utils.castSI64If(axVal),
@@ -161,8 +161,8 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
         return utils.retValWithInferedType(
                 builder.create<SliceAxOp>(
                         loc, utils.unknownType, arg,
-                        utils.castSizeIf(axLowerIncl),
-                        utils.castSizeIf(axUpperExcl)
+                        utils.castSI64If(axLowerIncl),
+                        utils.castSI64If(axUpperExcl)
                 )
         );
     }
@@ -180,7 +180,7 @@ mlir::Value DaphneDSLVisitor::applyLeftIndexing(mlir::Location loc, mlir::Value 
             throw std::runtime_error(
                     "left indexing with positions as a data object is not supported (yet)"
             );
-        else if(axVal.getType().isa<mlir::daphne::StringType>()) { // string
+        else if(llvm::isa<mlir::daphne::StringType>(axVal.getType())) { // string
             if(allowLabel)
                 // TODO Support this (#239).
                 throw std::runtime_error("left indexing by label is not supported yet");
@@ -196,8 +196,8 @@ mlir::Value DaphneDSLVisitor::applyLeftIndexing(mlir::Location loc, mlir::Value 
             return static_cast<mlir::Value>(
                     builder.create<InsertAxOp>(
                             loc, argType, arg, ins,
-                            utils.castSizeIf(axVal),
-                            utils.castSizeIf(
+                            utils.castSI64If(axVal),
+                            utils.castSI64If(
                                     builder.create<mlir::daphne::EwAddOp>(
                                             loc, builder.getIntegerType(64, false),
                                             utils.castSI64If(axVal),
@@ -223,8 +223,8 @@ mlir::Value DaphneDSLVisitor::applyLeftIndexing(mlir::Location loc, mlir::Value 
         return static_cast<mlir::Value>(
                 builder.create<InsertAxOp>(
                         loc, argType, arg, ins,
-                        utils.castSizeIf(axLowerIncl),
-                        utils.castSizeIf(axUpperExcl)
+                        utils.castSI64If(axLowerIncl),
+                        utils.castSI64If(axUpperExcl)
                 )
         );
     }
@@ -374,6 +374,9 @@ antlrcpp::Any DaphneDSLVisitor::visitImportStatement(DaphneDSLGrammarParser::Imp
         std::multimap<std::string, mlir::func::FuncOp> origFuncMap = functionsSymbolMap;
         functionsSymbolMap.clear();
 
+        std::vector<std::string> origImportedFiles = importedFiles;
+        importedFiles.clear();
+
         symbolTable.pushScope();
         scriptPaths.push(path);
         res = visitScript(importCtx);
@@ -387,6 +390,8 @@ antlrcpp::Any DaphneDSLVisitor::visitImportStatement(DaphneDSLGrammarParser::Imp
                 origScope[finalPrefix + symbol.first] = symbol.second;
 
         symbolTable.put(origScope);
+        
+        importedFiles = origImportedFiles;
         
         for(std::pair<std::string, mlir::func::FuncOp> funcSymbol : functionsSymbolMap)
             if(funcSymbol.first.find('.') == std::string::npos)
@@ -479,17 +484,20 @@ antlrcpp::Any DaphneDSLVisitor::visitIfStatement(DaphneDSLGrammarParser::IfState
     for(auto it = owUnion.begin(); it != owUnion.end(); it++) {
         mlir::Value valThen = symbolTable.get(*it, owThen).value;
         mlir::Value valElse = symbolTable.get(*it, owElse).value;
-        if(valThen.getType() != valElse.getType()) {
+        mlir::Type tyThen = valThen.getType();
+        mlir::Type tyElse = valElse.getType();
+        // TODO These checks should happen after type inference.
+        if(!CompilerUtils::equalUnknownAware(tyThen, tyElse)) {
             // TODO We could try to cast the types.
-            std::string s;
-            llvm::raw_string_ostream stream(s);
-            loc.print(stream);
-            stream << ":\n    ";
-            valThen.print(stream);
-            stream << "\n      is not equal to \n    ";
-            valElse.print(stream);
-            throw std::runtime_error(fmt::format("in {}:{}:\n  type mismatch near script location: {}",
-                    __FILE__, __LINE__, stream.str()));
+            // TODO Use DaphneDSL types (not MLIR types) in error message.
+            // TODO Adapt to the case of no else-branch in DaphneDSL (when there is no else in DaphneDSL,
+            // "else" should not be mentioned in the error message).
+            // TODO The variable name may be ambiguous (two vars mapped to the same value).
+            std::stringstream s;
+            s << "type of variable `" << symbolTable.getSymbol(valThen, owThen)
+                << "` after if-statement is ambiguous, could be either " << tyThen
+                << " (then-branch) or " << tyElse << " (else-branch)";
+            throw CompilerUtils::makeError(loc, s.str());
         }
         resultsThen.push_back(valThen);
         resultsElse.push_back(valElse);
@@ -789,7 +797,10 @@ antlrcpp::Any DaphneDSLVisitor::visitIdentifierExpr(DaphneDSLGrammarParser::Iden
         return symbolTable.get(var).value;
     }
     catch(std::runtime_error &) {
-        throw std::runtime_error("variable " + var + " referenced before assignment");
+        throw CompilerUtils::makeError(
+                utils.getLoc(ctx->start),
+                "variable `" + var + "` referenced before assignment"
+        );
     }
 }
 
@@ -817,7 +828,9 @@ bool DaphneDSLVisitor::argAndUDFParamCompatible(mlir::Type argTy, mlir::Type par
         ));
 }
 
-std::optional<mlir::func::FuncOp> DaphneDSLVisitor::findMatchingUDF(const std::string &functionName, const std::vector<mlir::Value> &args) const {
+std::optional<mlir::func::FuncOp> DaphneDSLVisitor::findMatchingUDF(
+    const std::string &functionName, const std::vector<mlir::Value> &args, mlir::Location loc
+) const {
     // search user defined functions
     auto range = functionsSymbolMap.equal_range(functionName);
     // TODO: find not only a matching version, but the `most` specialized
@@ -845,7 +858,32 @@ std::optional<mlir::func::FuncOp> DaphneDSLVisitor::findMatchingUDF(const std::s
     // UDF with the provided name exists, but no version matches the argument types
     if (range.second != range.first) {
         // FIXME: disallow user-defined function with same name as builtins, otherwise this would be wrong behaviour
-        throw std::runtime_error("No function definition of `" + functionName + "` found with matching types");
+        std::stringstream s;
+        s << "no definition of function `" << functionName << "` for argument types (";
+        for(size_t i = 0; i < args.size(); i++) {
+            s << args[i].getType();
+            if(i < args.size() - 1)
+                s << ", ";
+        }
+        // TODO For each available option, also say why it is not applicable (which type isn't compatible).
+        // TODO For each available option, also say where it is defined.
+        s << "), available options: ";
+        const size_t numOptions = functionsSymbolMap.count(functionName);
+        size_t i = 0;
+        for (auto it = range.first; it != range.second; ++it, ++i) {
+            s << functionName << '(';
+            auto userDefinedFunc = it->second;
+            auto funcTy = userDefinedFunc.getFunctionType();
+            for(size_t k = 0; k < funcTy.getNumInputs(); k++) {
+                s << funcTy.getInput(k);
+                if(k < funcTy.getNumInputs() - 1)
+                    s << ", ";
+            }
+            s << ')';
+            if(i < numOptions - 1)
+                s << ", ";
+        }
+        throw CompilerUtils::makeError(loc, s.str());
     }
 
     // UDF with the provided name does not exist
@@ -934,7 +972,7 @@ antlrcpp::Any DaphneDSLVisitor::visitCallExpr(DaphneDSLGrammarParser::CallExprCo
     for(unsigned i = 0; i < ctx->expr().size(); i++)
         args_vec.push_back(utils.valueOrError(visit(ctx->expr(i))));
 
-    auto maybeUDF = findMatchingUDF(func, args_vec);
+    auto maybeUDF = findMatchingUDF(func, args_vec, loc);
 
     if (maybeUDF) {
         auto funcTy = maybeUDF->getFunctionType();
@@ -968,12 +1006,12 @@ antlrcpp::Any DaphneDSLVisitor::visitCastExpr(DaphneDSLGrammarParser::CastExprCo
             else
             {
                 vt = utils.valueOrError(visit(ctx->expr())).getType();
-                if(vt.isa<mlir::daphne::FrameType>())
+                if(llvm::isa<mlir::daphne::FrameType>(vt))
                     // TODO Instead of using the value type of the first frame
                     // column as the value type of the matrix, we should better
                     // use the most general of all column types.
                     vt = vt.dyn_cast<mlir::daphne::FrameType>().getColumnTypes()[0];
-                if(vt.isa<mlir::daphne::MatrixType>())
+                if(llvm::isa<mlir::daphne::MatrixType>(vt))
                     vt = vt.dyn_cast<mlir::daphne::MatrixType>().getElementType();
             }
             resType = utils.matrixOf(vt);
@@ -990,9 +1028,9 @@ antlrcpp::Any DaphneDSLVisitor::visitCastExpr(DaphneDSLGrammarParser::CastExprCo
                 // TODO This fragment should be factored out, such that we can
                 // reuse it for matrix/frame/scalar.
                 mlir::Type argType = utils.valueOrError(visit(ctx->expr())).getType();
-                if(argType.isa<mlir::daphne::MatrixType>())
+                if(llvm::isa<mlir::daphne::MatrixType>(argType))
                     colTypes = {argType.dyn_cast<mlir::daphne::MatrixType>().getElementType()};
-                else if(argType.isa<mlir::daphne::FrameType>())
+                else if(llvm::isa<mlir::daphne::FrameType>(argType))
                     // TODO Instead of using the value type of the first frame
                     // column as the value type of the matrix, we should better
                     // use the most general of all column types.
@@ -1010,9 +1048,9 @@ antlrcpp::Any DaphneDSLVisitor::visitCastExpr(DaphneDSLGrammarParser::CastExprCo
                 // TODO This fragment should be factored out, such that we can
                 // reuse it for matrix/frame/scalar.
                 mlir::Type argType = utils.valueOrError(visit(ctx->expr())).getType();
-                if(argType.isa<mlir::daphne::MatrixType>())
+                if(llvm::isa<mlir::daphne::MatrixType>(argType))
                     resType = argType.dyn_cast<mlir::daphne::MatrixType>().getElementType();
-                else if(argType.isa<mlir::daphne::FrameType>())
+                else if(llvm::isa<mlir::daphne::FrameType>(argType))
                     // TODO Instead of using the value type of the first frame
                     // column as the value type of the matrix, we should better
                     // use the most general of all column types.
@@ -1030,15 +1068,17 @@ antlrcpp::Any DaphneDSLVisitor::visitCastExpr(DaphneDSLGrammarParser::CastExprCo
     { // Data type shall be retained
         mlir::Type vt = utils.getValueTypeByName(ctx->VALUE_TYPE()->getText());
         mlir::Type argTy = utils.valueOrError(visit(ctx->expr())).getType();
-        if(argTy.isa<mlir::daphne::MatrixType>())
+        if(llvm::isa<mlir::daphne::MatrixType>(argTy))
             resType = utils.matrixOf(vt);
-        else if(argTy.isa<mlir::daphne::FrameType>())
+        else if(llvm::isa<mlir::daphne::FrameType>(argTy))
         {
             throw std::runtime_error("casting to a frame with particular column types is not supported yet");
             //size_t numCols = argTy.dyn_cast<mlir::daphne::FrameType>().getColumnTypes().size();
             //std::vector<mlir::Type> colTypes(numCols, vt);
             //resType = mlir::daphne::FrameType::get(builder.getContext(), colTypes);
         }
+        else if(llvm::isa<mlir::daphne::UnknownType>(argTy))
+            resType = utils.unknownType;
         else
             resType = vt;
     }
@@ -1142,8 +1182,11 @@ antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser:
                 mlir::daphne::NumRowsOp
         >(utils.getLoc(ctx->idx->start), obj, rows.second, false);
     if(cols.first) // cols specified
-        obj = applyRightIndexing<mlir::daphne::ExtractColOp, mlir::daphne::SliceColOp, mlir::daphne::NumColsOp
-        >(utils.getLoc(ctx->idx->start), obj, cols.second, obj.getType().isa<mlir::daphne::FrameType>());
+        obj = applyRightIndexing<
+                mlir::daphne::ExtractColOp,
+                mlir::daphne::SliceColOp,
+                mlir::daphne::NumColsOp
+        >(utils.getLoc(ctx->idx->start), obj, cols.second, llvm::isa<mlir::daphne::FrameType>(obj.getType()));
 
     // Note: If rows and cols are specified, we create two extraction steps.
     // This can be inefficient, but it is simpler for now.
@@ -1742,17 +1785,33 @@ antlrcpp::Any DaphneDSLVisitor::visitFunctionStatement(DaphneDSLGrammarParser::F
         builder.create<mlir::daphne::ReturnOp>(utils.getLoc(ctx->stop));
     }
 
-    auto returnOpTypes = funcBlock->getTerminator()->getOperandTypes();
+    auto terminator = funcBlock->getTerminator();
+    auto returnOpTypes = terminator->getOperandTypes();
     if(!functionOperation) {
         // late creation if no return types defined
         functionOperation = createUserDefinedFuncOp(loc,
             builder.getFunctionType(funcArgTypes, returnOpTypes),
             functionName);
     }
-    // TODO Allow unknown type in return (could be subject to type inference).
-    else if(returnOpTypes != returnTypes) {
-        throw std::runtime_error(
-            "Function `" + functionName + "` returns different type than specified in the definition");
+    else {
+        if(returnOpTypes.size() != returnTypes.size()) {
+            std::stringstream s;
+            s << "function `" << functionName << "` returns a different number of "
+                << "values than specified in the definition (" << returnOpTypes.size()
+                << " vs. " << returnTypes.size() << ')';
+            throw CompilerUtils::makeError(terminator->getLoc(), s.str());
+        }
+        for(size_t i = 0; i < returnTypes.size(); i++)
+            // TODO These checks should happen after type inference.
+            if(!CompilerUtils::equalUnknownAware(returnOpTypes[i], returnTypes[i])) {
+                std::stringstream s;
+                s << "function `" << functionName
+                    << "` returns a different type for return value #"
+                    << i << " than specified in the definition ("
+                    << returnOpTypes[i] << " vs. " << returnTypes[i] << ')';
+                // TODO Should we use the location of the i-th argument of the ReturnOp (more precise)?
+                throw CompilerUtils::makeError(terminator->getLoc(), s.str());
+            }
     }
     functionOperation.getBody().push_front(funcBlock);
 

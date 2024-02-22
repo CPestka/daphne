@@ -98,7 +98,8 @@ class ContiguousTensor : public Tensor<ValueType> {
         if constexpr (std::is_same<VTArg, ValueType>::value) { 
             data = other->data;
         } else {
-            data = std::make_shared<ValueType[]>(this->total_element_count);
+            data = std::shared_ptr<ValueType[]>(new ValueType[this->total_element_count], std::default_delete<ValueType[]>());
+            //data = std::make_shared<ValueType[]>(this->total_element_count);
          for(size_t i=0; i<this->total_element_count; i++) {
             data[i] = static_cast<ValueType>(other->data[i]);
          }

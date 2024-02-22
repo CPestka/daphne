@@ -20,6 +20,7 @@ set(TEST_SOURCES
         run_tests.cpp
 
         api/cli/algorithms/AlgorithmsTest.cpp
+        api/cli/algorithms/DecisionTreeRandomForestTest.cpp
         api/cli/config/ConfigTest.cpp
         api/cli/controlflow/ControlFlowTest.cpp
         api/cli/distributed/DistributedTest.cpp
@@ -84,6 +85,7 @@ set(TEST_SOURCES
         runtime/local/kernels/AggCumTest.cpp
         runtime/local/kernels/AggRowTest.cpp
         runtime/local/kernels/AggTest.cpp
+        runtime/local/kernels/BinTest.cpp
         runtime/local/kernels/CartesianTest.cpp
         runtime/local/kernels/CastObjTest.cpp
         runtime/local/kernels/CastObjScaTest.cpp
@@ -101,6 +103,7 @@ set(TEST_SOURCES
         runtime/local/kernels/EwBinaryMatTest.cpp
         runtime/local/kernels/EwBinaryObjScaTest.cpp
         runtime/local/kernels/EwBinaryScaTest.cpp
+        runtime/local/kernels/EwUnaryMatTest.cpp
         runtime/local/kernels/EwUnaryScaTest.cpp
         runtime/local/kernels/ExtractColTest.cpp
         runtime/local/kernels/ExtractRowTest.cpp
@@ -110,6 +113,8 @@ set(TEST_SOURCES
         runtime/local/kernels/GroupTest.cpp
         runtime/local/kernels/HasSpecialValueTest.cpp
         runtime/local/kernels/InnerJoinTest.cpp
+        runtime/local/kernels/InsertColTest.cpp
+        runtime/local/kernels/InsertRowTest.cpp
         runtime/local/kernels/IsSymmetricTest.cpp
         runtime/local/kernels/NumDistinctApproxTest.cpp
         runtime/local/kernels/MapTest.cpp
@@ -119,6 +124,7 @@ set(TEST_SOURCES
         runtime/local/kernels/QuantizeTest.cpp
         runtime/local/kernels/RandMatrixTest.cpp
         runtime/local/kernels/ReadTest.cpp
+        runtime/local/kernels/RecodeTest.cpp
         runtime/local/kernels/ReduceRankTest.cpp
         runtime/local/kernels/ReplaceTest.cpp
         runtime/local/kernels/ReshapeTest.cpp

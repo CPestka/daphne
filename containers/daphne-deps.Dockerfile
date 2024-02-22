@@ -21,7 +21,7 @@
 
 # defaults:
 ARG BASE_IMAGE=ubuntu:20.04
-ARG CMAKE_VERSION=3.26.4
+ARG CMAKE_VERSION=3.28.1
 ARG DEBIAN_FRONTEND="noninteractive"
 ARG DEBCONF_NOWARNINGS="yes"
 ARG DAPHNE_DIR=/daphne
@@ -38,7 +38,7 @@ RUN apt-get -qq -y update && apt-get -y upgrade \
     && apt-get -y --no-install-recommends install  \
     ca-certificates file git openssh-client unzip wget tar \
     libomp-dev  libpfm4-dev libssl-dev libxml2-dev uuid-dev zlib1g-dev \
-    build-essential clang gfortran lld llvm ninja-build openjdk-11-jdk-headless pkg-config python3 \
+    build-essential clang gfortran lld llvm llvm-10-tools ninja-build openjdk-11-jdk-headless pkg-config python3 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 FROM base as build-cmake
@@ -86,4 +86,5 @@ RUN ldconfig
 
 FROM daphneeu/daphne-deps as github-action
 RUN apt-get -qq -y update && apt-get -y upgrade && apt-get -y --no-install-recommends install  \
-    moreutils python3-numpy python3-pandas && apt-get clean && rm -rf /var/lib/apt/lists/*
+    moreutils python3-numpy python3-pandas ccache python3-pip python3-networkx python3-dev graphviz-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*

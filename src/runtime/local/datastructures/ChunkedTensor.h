@@ -183,38 +183,41 @@ class ChunkedTensor : public Tensor<ValueType> {
           intra_chunk_strides(other->intra_chunk_strides), chunks_per_dim(other->chunks_per_dim),
           total_size_in_elements(other->total_size_in_elements), total_chunk_count(other->total_chunk_count),
           chunk_materialization_flags(std::make_unique<std::atomic<bool>[]>(total_chunk_count)) {
-        data = std::make_shared<ValueType[]>(total_size_in_elements);
+        data = std::shared_ptr<ValueType[]>(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>());
+        //data = std::make_shared<ValueType[]>(total_size_in_elements);
         for (size_t i = 0; i < total_chunk_count; i++) {
             chunk_materialization_flags[i] = static_cast<bool>(other->chunk_materialization_flags[i]);
         }
         chunk_io_futures = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
         for (size_t i = 0; i < total_chunk_count; i++) {
-            chunk_io_futures[i].needs_byte_reversal = false;
-            chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
+            chunk_io_futures[i].needs_byte_reversal = other->chunk_io_futures[i].needs_byte_reversal;
+            chunk_io_futures[i].status              = other->chunk_io_futures[i].status.load();
         }
         for(size_t i=0; i<total_size_in_elements; i++) {
             data[i] = static_cast<ValueType>(other->data[i]);
         }
     }
 
-    template<>
-    explicit ChunkedTensor(const ChunkedTensor<ValueType> *other)
-        : Tensor<ValueType>::Tensor(other->tensor_shape), chunk_shape(other->chunk_shape),
-          chunk_element_count(other->chunk_element_count), chunk_strides(other->chunk_strides),
-          intra_chunk_strides(other->intra_chunk_strides), chunks_per_dim(other->chunks_per_dim),
-          total_size_in_elements(other->total_size_in_elements), total_chunk_count(other->total_chunk_count),
-          chunk_materialization_flags(std::make_unique<std::atomic<bool>[]>(total_chunk_count)),
-          data(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>()) {
-        for (size_t i = 0; i < total_chunk_count; i++) {
-            chunk_materialization_flags[i] = static_cast<bool>(other->chunk_materialization_flags[i]);
-        }
-        chunk_io_futures = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
-        for (size_t i = 0; i < total_chunk_count; i++) {
-            chunk_io_futures[i].needs_byte_reversal = false;
-            chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
-        }
-        std::memcpy(data.get(), other->data.get(), total_size_in_elements * sizeof(ValueType));
-    }
+    // disabled for now due to gcc template specialization bug
+    // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85282
+    // template<>
+    // explicit ChunkedTensor(const ChunkedTensor<ValueType> *other)
+    //     : Tensor<ValueType>::Tensor(other->tensor_shape), chunk_shape(other->chunk_shape),
+    //       chunk_element_count(other->chunk_element_count), chunk_strides(other->chunk_strides),
+    //       intra_chunk_strides(other->intra_chunk_strides), chunks_per_dim(other->chunks_per_dim),
+    //       total_size_in_elements(other->total_size_in_elements), total_chunk_count(other->total_chunk_count),
+    //       chunk_materialization_flags(std::make_unique<std::atomic<bool>[]>(total_chunk_count)),
+    //       data(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>()) {
+    //     for (size_t i = 0; i < total_chunk_count; i++) {
+    //         chunk_materialization_flags[i] = static_cast<bool>(other->chunk_materialization_flags[i]);
+    //     }
+    //     chunk_io_futures = std::make_unique<AsyncIOInfo[]>(total_chunk_count);
+    //     for (size_t i = 0; i < total_chunk_count; i++) {
+    //         chunk_io_futures[i].needs_byte_reversal = false;
+    //         chunk_io_futures[i].status              = IO_STATUS::PRE_SUBMISSION;
+    //     }
+    //     std::memcpy(data.get(), other->data.get(), total_size_in_elements * sizeof(ValueType));
+    // }
 
     ChunkedTensor(const DenseMatrix<ValueType> *matrix, size_t chunk_size_x, size_t chunk_size_y)
         : Tensor<ValueType>::Tensor(matrix->getNumRows(), matrix->getNumCols()) {

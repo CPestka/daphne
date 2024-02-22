@@ -20,6 +20,9 @@
 
 ## Developer Documentation
 
+* [Creating release artifacts](ReleaseScripts.md)
+* [Maintaining GPG signing keys](GPG-signing-keys.md)
+
 ### How-tos and Guidelines
 
 - [Handling a Pull Request](/doc/development/HandlingPRs.md)
@@ -30,7 +33,7 @@
 - [Extending the DAPHNE Distributed Runtime](/doc/development/ExtendingDistributedRuntime.md)
 - [Building DAPHNE with the build.sh script](/doc/development/BuildingDaphne.md)
 - [Logging in DAPHNE](/doc/development/Logging.md)
-- [Profiling in DAPHNE](/doc/development/Profling.md)
+- [Profiling in DAPHNE](/doc/development/Profiling.md)
 
 ### Source Code Documentation
 

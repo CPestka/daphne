@@ -73,7 +73,7 @@ std::vector<Type> daphne::CastOp::inferTypes() {
 
     // If the result type is a matrix with so far unknown value type, then we
     // infer the value type from the argument.
-    if (mtRes && mtRes.getElementType().isa<daphne::UnknownType>()) {
+    if(mtRes && llvm::isa<daphne::UnknownType>(mtRes.getElementType())) {
         Type resVt;
 
         if (mtArg)
@@ -119,9 +119,25 @@ std::vector<Type> daphne::ExtractColOp::inferTypes() {
         // Extracting columns from a frame may change the list of column value types (schema).
         std::vector<Type> resColTys;
 
-        if (auto selStrTy = selTy.dyn_cast<daphne::StringType>())
-            // Extracting a single column by its string label.
-            resColTys = {getFrameColumnTypeByLabel(srcFrmTy, getSelectedCols())};
+        if (auto selStrTy = selTy.dyn_cast<daphne::StringType>()) {
+            std::string label = CompilerUtils::constantOrThrow<std::string>(getSelectedCols());
+            std::string delimiter = ".";
+            const std::string frameName = label.substr(0, label.find(delimiter));
+            const std::string colLabel = label.substr(label.find(delimiter) + delimiter.length(), label.length());
+            if(colLabel.compare("*") == 0) {
+                std::vector<std::string> labels = *srcFrmTy.getLabels();
+                std::vector<mlir::Type> colTypes = srcFrmTy.getColumnTypes();
+                for (size_t i = 0; i < labels.size(); i++) {
+                    std::string labelFrameName = labels[i].substr(0, labels[i].find(delimiter));
+                    if (labelFrameName.compare(frameName) == 0) {
+                        resColTys.push_back(colTypes[i]);
+                    }
+                }
+            } else {
+                // Extracting a single column by its string label.
+                resColTys = {getFrameColumnTypeByLabel(srcFrmTy, getSelectedCols())};
+            }
+        }
         else if (auto selMatTy = selTy.dyn_cast<daphne::MatrixType>()) {
             // Extracting columns by their positions (given as a column matrix).
 
@@ -227,9 +243,31 @@ std::vector<Type> daphne::GroupOp::inferTypes() {
     std::vector<Value> aggColValues;
     std::vector<std::string> aggFuncNames;
 
-    for (Value t : getKeyCol()) {
-        // Key Types getting adopted for the new Frame
-        newColumnTypes.push_back(getFrameColumnTypeByLabel(arg, t));
+    for(Value t : getKeyCol()){
+        //Key Types getting adopted for the new Frame
+        std::string labelStr = CompilerUtils::constantOrThrow<std::string>(
+            t, "the specified label must be a constant of string type"
+        );
+        std::string delimiter = ".";
+        const std::string frameName = labelStr.substr(0, labelStr.find(delimiter));
+        const std::string colLabel = labelStr.substr(labelStr.find(delimiter) + delimiter.length(), labelStr.length());
+        if(labelStr == "*") {
+            auto allTypes = arg.getColumnTypes();
+            for (Type type: allTypes) {
+                newColumnTypes.push_back(type);
+            }
+        } else if(colLabel.compare("*") == 0) {
+            std::vector<std::string> labels = *arg.getLabels();
+            std::vector<mlir::Type> colTypes = arg.getColumnTypes();
+            for (size_t i = 0; i < labels.size(); i++) {
+                std::string labelFrameName = labels[i].substr(0, labels[i].find(delimiter));
+                if (labelFrameName.compare(frameName) == 0) {
+                    newColumnTypes.push_back(colTypes[i]);
+                }
+            }
+        } else {
+            newColumnTypes.push_back(getFrameColumnTypeByLabel(arg, t));
+        }
     }
 
     // Values get collected in a easier to use Datastructure
@@ -465,13 +503,13 @@ std::vector<Type> daphne::SliceColOp::inferTypes() {
 
 std::vector<Type> daphne::CondOp::inferTypes() {
     Type condTy = getCond().getType();
-    if (condTy.isa<daphne::UnknownType>())
+    if(llvm::isa<daphne::UnknownType>(condTy))
         return {daphne::UnknownType::get(getContext())};
     if (auto condMatTy = condTy.dyn_cast<daphne::MatrixType>()) {
         Type thenTy = getThenVal().getType();
         Type elseTy = getElseVal().getType();
 
-        if (thenTy.isa<daphne::FrameType>() || elseTy.isa<daphne::FrameType>())
+        if(llvm::isa<daphne::FrameType>(thenTy) || llvm::isa<daphne::FrameType>(elseTy))
             throw std::runtime_error(
               "CondOp does not support frames for the then-value or else-value if "
               "the condition is a matrix");
@@ -479,8 +517,11 @@ std::vector<Type> daphne::CondOp::inferTypes() {
         Type thenValTy = CompilerUtils::getValueType(thenTy);
         Type elseValTy = CompilerUtils::getValueType(elseTy);
 
-        if (thenValTy != elseValTy)
-            throw std::runtime_error("the then/else-values of CondOp must have the same value type");
+        if(thenValTy != elseValTy)
+            throw CompilerUtils::makeError(
+                    getLoc(),
+                    "the then/else-values of CondOp must have the same value type"
+            );
 
         return {daphne::MatrixType::get(getContext(), thenValTy)};
     } else if (auto condFrmTy = condTy.dyn_cast<daphne::FrameType>())
@@ -511,6 +552,64 @@ std::vector<Type> daphne::CondOp::inferTypes() {
         // value have been removed.
         return {thenTy};
     }
+}
+
+std::vector<Type> daphne::RecodeOp::inferTypes() {
+    // Intuition:
+    // - The (data) result has the same data type as the argument.
+    // - The (data) result has the value type si64.
+    // - The (dict) result has the data type matrix.
+    // - The (dict) result has the value type of the argument.
+    //   - If the argument is a frame, all its columns must have the same
+    //     value type (alternatively, one could take the most general one).
+
+    MLIRContext * ctx = getContext();
+
+    Type argTy = getArg().getType();
+    Type si64 = IntegerType::get(ctx, 64, IntegerType::SignednessSemantics::Signed);
+    Type u = daphne::UnknownType::get(ctx);
+
+    Type resTy;
+    Type dictValTy;
+    if(auto argMatTy = llvm::dyn_cast<daphne::MatrixType>(argTy)) {
+        resTy = daphne::MatrixType::get(ctx, si64);
+        dictValTy = argMatTy.getElementType();
+    }
+    else if(auto argFrmTy = llvm::dyn_cast<daphne::FrameType>(argTy)) {
+        std::vector<Type> argColTys = argFrmTy.getColumnTypes();
+        if(argColTys.size() == 0) {
+            resTy = daphne::FrameType::get(ctx, {});
+            dictValTy = u;
+        }
+        else {
+            std::vector<Type> resColTys(argColTys.size(), si64);
+            resTy = daphne::FrameType::get(ctx, resColTys);
+            dictValTy = nullptr;
+            bool hasUnknownColTy = false;
+            for(Type argColTy : argColTys) {
+                if(llvm::isa<daphne::UnknownType>(argColTy))
+                    hasUnknownColTy = true;
+                else {
+                    if(!dictValTy)
+                        dictValTy = argColTy;
+                    else if(argColTy != dictValTy)
+                        throw std::runtime_error(
+                            "when a frame is used as the argument to recode, "
+                            "all its columns must have the same value type"
+                        );
+                }
+            }
+            if(!dictValTy || hasUnknownColTy)
+                dictValTy = u;
+        }
+    }
+    else if(llvm::isa<daphne::UnknownType>(argTy))
+        resTy = u;
+    else
+        throw std::runtime_error("the argument to recode has an invalid type");
+
+    Type dictTy = daphne::MatrixType::get(ctx, dictValTy);
+    return {resTy, dictTy};
 }
 
 // ****************************************************************************
@@ -559,15 +658,16 @@ void daphne::setInferedTypes(Operation* op, bool partialInferenceAllowed) {
                                  std::to_string(types.size()) + " types, but the op has " + std::to_string(numRes) +
                                  " results");
     // Set the inferred types on all results of this operation.
-    for (size_t i = 0; i < numRes; i++) {
-        if (types[i].isa<daphne::UnknownType>() && !partialInferenceAllowed)
+    for(size_t i = 0; i < numRes; i++) {
+        if (llvm::isa<daphne::UnknownType>(types[i]) && !partialInferenceAllowed)
             // TODO As soon as the run-time can handle unknown
             // data/value types, we do not need to throw here anymore.
-            throw std::runtime_error(
-              "type inference returned an unknown result type "
-              "for some op, but partial inference is not allowed "
-              "at this point: " +
-              op->getName().getStringRef().str());
+            throw CompilerUtils::makeError(
+                    op->getLoc(),
+                    "type inference returned an unknown result type "
+                    "for some op, but partial inference is not allowed "
+                    "at this point: " + op->getName().getStringRef().str()
+            );
         op->getResult(i).setType(types[i]);
     }
 }
