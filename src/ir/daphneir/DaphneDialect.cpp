@@ -506,13 +506,19 @@ mlir::OpFoldResult mlir::daphne::ConstantOp::fold(FoldAdaptor adaptor) {
     return mlir::success();
 }
 
-::mlir::LogicalResult mlir::daphne::TensorType::verify(::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError, Type elementType, ssize_t numX, ssize_t numY, ssize_t numZ, TensorRepresentation representation)
+::mlir::LogicalResult mlir::daphne::HandleType::verify(::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError,
+                                                       Type dataType)
 {
-    if (llvm::isa<MatrixType>(elementType)) {
+    if (llvm::isa<MatrixType>(dataType)) {
         return mlir::success();
     }
     else
-        return emitError() << "only matrix type is supported for handle atm, got: " << elementType;
+        return emitError() << "only matrix type is supported for handle atm, got: " << dataType;
+}
+
+::mlir::LogicalResult mlir::daphne::TensorType::verify(::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError, Type elementType, ssize_t numX, ssize_t numY, ssize_t numZ, TensorRepresentation representation)
+{
+    return mlir::success();
 }
 
 mlir::LogicalResult mlir::daphne::VectorizedPipelineOp::canonicalize(mlir::daphne::VectorizedPipelineOp op,
