@@ -27,6 +27,7 @@
 #include <fstream>
 #include <filesystem>
 #include <bit>
+#include <sstream>
 
 #include <spdlog/spdlog.h>
 
@@ -78,6 +79,11 @@ void readZarr(DTRes *&res, const char *filename, const std::vector<std::pair<siz
         log->error("Tensors of dimensionality 0 (i.e. scalars) are currently not supported during reading");
         throw std::runtime_error("Tensors of dim 0 i.e. scalars are currently not supported during reading");
     }
+    std::stringstream ss;
+    for (const auto& e : element_id_ranges) {
+        ss << "(" << e.first << ";" << e.second << ")";
+    }
+    log->info("Issuing a partial read on file '{}' for element ranges [{}]", filename, ss.str());
     PartialReadZarr<DTRes>::apply(res, filename, fmd, element_id_ranges, log);
 }
 
@@ -93,6 +99,11 @@ void readZarr(DTRes *&res,
         log->error("Tensors of dimensionality 0 (i.e. scalars) are currently not supported during reading");
         throw std::runtime_error("Tensors of dim 0 i.e. scalars are currently not supported during reading");
     }
+    std::stringstream ss;
+    for (const auto& e : element_id_ranges) {
+        ss << "(" << e.first << ";" << e.second << ")";
+    }
+    log->info("Issuing a partial read on file '{}' for element ranges [{}]", filename, ss.str());
     PartialReadZarr<DTRes>::apply(res, filename, fmd, element_id_ranges, io_uring_pool, log);
 }
 
@@ -105,6 +116,11 @@ void partialReadZarr(DTRes *&res, const char *filename, uint32_t lowerX, uint32_
         log->error("Tensors of dimensionality 0 (i.e. scalars) are currently not supported during reading");
         throw std::runtime_error("Tensors of dim 0 i.e. scalars are currently not supported during reading");
     }
+    std::stringstream ss;
+    ss << "(" << lowerX << "," << upperX << ")";
+    ss << "(" << lowerY << "," << upperY << ")";
+    ss << "(" << lowerZ << "," << upperZ << ")";
+    log->debug("Issuing a partial read on file '{}' for element ranges [{}]", filename, ss.str());
     PartialReadZarr<DTRes>::apply(res, filename, fmd, {{lowerX, upperX},{lowerY,upperY},{lowerZ,upperZ}}, log);
 }
 
@@ -410,7 +426,7 @@ struct PartialReadZarr<ChunkedTensor<VT>> {
         std::optional<std::vector<std::vector<size_t>>> requested_chunk_ids = res->GetChunkListFromIdRange(element_id_ranges);
 
         if (!requested_chunk_ids) {
-            throw std::runtime_error("PartialReadZarr->ChunkedTensor: Invalid element range. Range out of bounds or has mismatching dimension");
+            throw std::runtime_error("PartialReadZarr->ChunkedTensor: Invalid element range. Range out-of-bounds or has mismatching dimension");
         }
 
         std::stringstream ss;
@@ -422,7 +438,7 @@ struct PartialReadZarr<ChunkedTensor<VT>> {
             ss << "]";
         }
 
-        std::cout << "Reading " << requested_chunk_ids.value().size() << " " << ss.str() << " out of " << total_number_of_chunks << " chunks" << std::endl;
+        log->debug("Reading {} out of {} chunks", requested_chunk_ids.value().size(), total_number_of_chunks);
 
         bool endianness_match = checkEndiannessMatch(zfmd.byte_order, log);
 

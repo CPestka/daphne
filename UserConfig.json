@@ -38,6 +38,20 @@
             "format": "%^[%L %n]:%$ %v"
         },
         {
+            "comment": "general runtime tensor log",
+            "name": "runtime::tensor",
+            "level": "DEBUG",
+            "filename": "runtime-tensor.txt",
+            "format": "%+"
+        },
+        {
+            "comment": "general io tensor log",
+            "name": "runtime::io::zarr",
+            "level": "DEBUG",
+            "filename": "runtime-tensor.txt",
+            "format": "%+"
+        },
+        {
             "comment": "DAPHNE compiler logs",
             "name": "compiler",
             "level": "INFO",

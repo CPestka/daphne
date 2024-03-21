@@ -25,6 +25,7 @@
 #include <ostream>
 #include <tuple>
 #include <vector>
+#include <sstream>
 
 #include <runtime/local/datastructures/ContiguousTensor.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
@@ -65,8 +66,13 @@ class ChunkedTensor : public Tensor<ValueType> {
 
     std::shared_ptr<ValueType[]> data;
 
+    std::shared_ptr<spdlog::logger> logger;
+
     ChunkedTensor(const std::vector<size_t> &tensor_shape, const std::vector<size_t> &chunk_shape, InitCode init_code)
         : Tensor<ValueType>::Tensor(tensor_shape), chunk_shape(chunk_shape) {
+
+        logger = spdlog::get("runtime::tensor");
+
         chunk_strides.resize(this->rank);
         intra_chunk_strides.resize(this->rank);
 
@@ -76,7 +82,8 @@ class ChunkedTensor : public Tensor<ValueType> {
 
         for(size_t i=0; i<this->rank; i++) {
             if ((tensor_shape[i] == 0) || chunk_shape[i] == 0) {
-                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+                logger->error("Tensors with dimensions of extent 0 are disallowed");
+                throw std::runtime_error("Tensors with dimensions of extent 0 are disallowed.");
             }
         }
 
@@ -223,7 +230,8 @@ class ChunkedTensor : public Tensor<ValueType> {
         : Tensor<ValueType>::Tensor(matrix->getNumRows(), matrix->getNumCols()) {
         for(size_t i=0; i<this->rank; i++) {
             if ((this->tensor_shape[i] == 0) || chunk_shape[i] == 0)  {
-                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+                logger->error("Tensors with dimensions of extent 0 are disallowed");
+                throw std::runtime_error("Tensors with dimensions of extent 0 are disallowed.");
             }
         }
 
@@ -269,7 +277,8 @@ class ChunkedTensor : public Tensor<ValueType> {
 
         for(size_t i=0; i<this->rank; i++) {
             if ((this->tensor_shape[i] == 0) || chunk_shape[i] == 0) {
-                throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
+                logger->error("Tensors with dimensions of extent 0 are disallowed");
+                throw std::runtime_error("Tensors with dimensions of extent 0 are disallowed.");
             }
         }
 
@@ -942,7 +951,15 @@ class ChunkedTensor : public Tensor<ValueType> {
     // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
     ChunkedTensor<ValueType> *tryDice(std::vector<std::pair<size_t, size_t>> index_ranges,
                                       const std::vector<size_t> &new_chunk_shape) const {
+
+        std::stringstream ss;
+        for (const auto& e : index_ranges) {
+            ss << "(" << e.first << "," << e.second << ")";
+        }
+        logger->debug("Issuing a dice for element ranges [{}]", ss.str());
+
         if (index_ranges.size() != this->rank || new_chunk_shape.size() != this->rank) {
+            logger->error("index_ranges.size() != this->rank || new_chunk_shape.size() != this->rank");
             return nullptr;
         }
 
@@ -958,6 +975,7 @@ class ChunkedTensor : public Tensor<ValueType> {
             if (std::get<0>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<1>(index_ranges[i]) >= this->tensor_shape[i] ||
                 std::get<0>(index_ranges[i]) > std::get<1>(index_ranges[i])) {
+                logger->error("std::get<0>(index_ranges[i]) >= this->tensor_shape[i]");
                 return nullptr;
             }
         }
@@ -968,6 +986,12 @@ class ChunkedTensor : public Tensor<ValueType> {
 
             for (size_t j = lhs_chunk_id; j <= rhs_chunk_id; j++) {
                 if (!chunk_materialization_flags[j]) {
+                    std::stringstream ss;
+                    for (size_t i = 0; i < this->total_chunk_count; ++i) {
+                        ss << chunk_materialization_flags[i] << " ";
+                    }
+                    logger->error("!chunk_materialization_flags[{}]", j);
+                    logger->error("chunk_materialization_flags[{}]", ss.str());
                     return nullptr;
                 }
             }
