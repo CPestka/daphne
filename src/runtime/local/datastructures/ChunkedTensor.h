@@ -881,7 +881,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     }
 
     // Ranges inclusive on lower bound and exlcusive on upper bound i.e. [x,y] at dsl lvl is in math == [x:y)
-    ChunkedTensor<ValueType> *tryDiceAtChunkLvl(std::vector<std::pair<size_t, size_t>> chunk_ranges) const {
+    ChunkedTensor<ValueType> *tryDiceAtChunkLvl(std::vector<std::pair<size_t, size_t>>& chunk_ranges) const {
         if (chunk_ranges.size() != this->rank) {
             return nullptr;
         }
@@ -898,6 +898,38 @@ class ChunkedTensor : public Tensor<ValueType> {
             if (std::get<0>(chunk_ranges[i]) >= chunks_per_dim[i] ||
                 std::get<1>(chunk_ranges[i]) >= chunks_per_dim[i] ||
                 std::get<0>(chunk_ranges[i]) > std::get<1>(chunk_ranges[i])) {
+                return nullptr;
+            }
+        }
+
+        std::vector<size_t> new_chunk_strides;
+        std::vector<size_t> new_chunk_count_per_dim;
+        new_chunk_strides.resize(this->rank);
+        new_chunk_count_per_dim.resize(this->rank);
+        new_chunk_strides[0] = 1;
+        new_chunk_count_per_dim[0] = std::get<1>(chunk_ranges[0]) - std::get<0>(chunk_ranges[0]) + 1;
+        size_t chunk_count = new_chunk_count_per_dim[0];
+        for(size_t i=1; i<this->rank; i++) {
+            new_chunk_count_per_dim[i] = std::get<1>(chunk_ranges[i]) - std::get<0>(chunk_ranges[i]) + 1;
+            chunk_count *= new_chunk_count_per_dim[i];
+            new_chunk_strides[i] = new_chunk_strides[i-1] * new_chunk_count_per_dim[i-1];
+        }
+
+        std::vector<size_t> current_chunk_ids;
+        current_chunk_ids.resize(this->rank);
+        for(size_t i=0; i<chunk_count; i++) {
+            size_t tmp = i;
+            for(int64_t j=this->rank-1; j>=0; j--) {
+                current_chunk_ids[static_cast<size_t>(j)] = (tmp / new_chunk_strides[static_cast<size_t>(j)]) + std::get<0>(chunk_ranges[static_cast<size_t>(j)]);
+                tmp = tmp % new_chunk_strides[j];
+            }
+
+            if (!IsChunkMaterialized(current_chunk_ids)) {
+                // std::stringstream ss;
+                // for (const auto& e : current_chunk_ids) {
+                //     ss << "(" << e.first << "," << e.second << ")";
+                // }
+                // logger->debug("Chunk [{}] not materialized.", ss.str());
                 return nullptr;
             }
         }
@@ -980,20 +1012,35 @@ class ChunkedTensor : public Tensor<ValueType> {
             }
         }
 
-        for (size_t i = 0; i < this->rank; i++) {
-            size_t lhs_chunk_id = std::get<0>(index_ranges[i]) / chunk_shape[i];
-            size_t rhs_chunk_id = std::get<1>(index_ranges[i]) / chunk_shape[i];
+        std::vector<size_t> new_chunk_strides;
+        std::vector<size_t> new_chunk_count_per_dim;
+        new_chunk_strides.resize(this->rank);
+        new_chunk_count_per_dim.resize(this->rank);
+        new_chunk_strides[0] = 1;
+        new_chunk_count_per_dim[0] = (std::get<1>(index_ranges[0]) / chunk_shape[0]) - (std::get<0>(index_ranges[0]) / chunk_shape[0]) + 1;
+        size_t chunk_count = new_chunk_count_per_dim[0];
+        for(size_t i=1; i<this->rank; i++) {
+            new_chunk_count_per_dim[i] = (std::get<1>(index_ranges[i]) / chunk_shape[i]) - (std::get<0>(index_ranges[i]) / chunk_shape[i]) + 1;
+            chunk_count *= new_chunk_count_per_dim[i];
+            new_chunk_strides[i] = new_chunk_strides[i-1] * new_chunk_count_per_dim[i-1];
+        }
 
-            for (size_t j = lhs_chunk_id; j <= rhs_chunk_id; j++) {
-                if (!chunk_materialization_flags[j]) {
-                    std::stringstream ss;
-                    for (size_t i = 0; i < this->total_chunk_count; ++i) {
-                        ss << chunk_materialization_flags[i] << " ";
-                    }
-                    logger->error("!chunk_materialization_flags[{}]", j);
-                    logger->error("chunk_materialization_flags[{}]", ss.str());
-                    return nullptr;
-                }
+        std::vector<size_t> current_chunk_ids;
+        current_chunk_ids.resize(this->rank);
+        for(size_t i=0; i<chunk_count; i++) {
+            size_t tmp = i;
+            for(int64_t j=this->rank-1; j>=0; j--) {
+                current_chunk_ids[static_cast<size_t>(j)] = (tmp / new_chunk_strides[j]) + (std::get<0>(index_ranges[j]) / chunk_shape[j]);
+                tmp = tmp % new_chunk_strides[j];
+            }
+
+            if (!IsChunkMaterialized(current_chunk_ids)) {
+                // std::stringstream ss1;
+                // for (const auto& e : current_chunk_ids) {
+                //     ss << "(" << e.first << "," << e.second << ")";
+                // }
+                // logger->debug("Chunk [{}] not materialized.", ss.str());
+                return nullptr;
             }
         }
 
@@ -1083,14 +1130,35 @@ class ChunkedTensor : public Tensor<ValueType> {
             }
         }
 
-        for (size_t i = 0; i < this->rank; i++) {
-            size_t lhs_chunk_id = std::get<0>(index_ranges[i]) / chunk_shape[i];
-            size_t rhs_chunk_id = std::get<1>(index_ranges[i]) / chunk_shape[i];
+        std::vector<size_t> new_chunk_strides;
+        std::vector<size_t> new_chunk_count_per_dim;
+        new_chunk_strides.resize(this->rank);
+        new_chunk_count_per_dim.resize(this->rank);
+        new_chunk_strides[0] = 1;
+        new_chunk_count_per_dim[0] = (std::get<1>(index_ranges[0]) / chunk_shape[0]) - (std::get<0>(index_ranges[0]) / chunk_shape[0]) + 1;
+        size_t chunk_count = new_chunk_count_per_dim[0];
+        for(size_t i=1; i<this->rank; i++) {
+            new_chunk_count_per_dim[i] = (std::get<1>(index_ranges[i]) / chunk_shape[i]) - (std::get<0>(index_ranges[i]) / chunk_shape[i]) + 1;
+            chunk_count *= new_chunk_count_per_dim[i];
+            new_chunk_strides[i] = new_chunk_strides[i-1] * new_chunk_count_per_dim[i-1];
+        }
 
-            for (size_t j = lhs_chunk_id; j <= rhs_chunk_id; j++) {
-                if (!chunk_materialization_flags[j]) {
-                    return nullptr;
-                }
+        std::vector<size_t> current_chunk_ids;
+        current_chunk_ids.resize(this->rank);
+        for(size_t i=0; i<chunk_count; i++) {
+            size_t tmp = i;
+            for(int64_t j=this->rank-1; j>=0; j--) {
+                current_chunk_ids[static_cast<size_t>(j)] = (tmp / new_chunk_strides[j]) + (std::get<0>(index_ranges[j]) / chunk_shape[j]);
+                tmp = tmp % new_chunk_strides[j];
+            }
+
+            if (!IsChunkMaterialized(current_chunk_ids)) {
+                // std::stringstream ss;
+                // for (const auto& e : current_chunk_ids) {
+                //     ss << "(" << e.first << "," << e.second << ")";
+                // }
+                // logger->debug("Chunk [{}] not materialized.", ss.str());
+                return nullptr;
             }
         }
 
