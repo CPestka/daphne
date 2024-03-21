@@ -44,6 +44,7 @@
                     ["double", ["DenseMatrix", "int64_t"]],
                     ["float", ["DenseMatrix", "int64_t"]],
                     ["double", ["CSRMatrix", "double"]],
+                    ["float", ["CSRMatrix", "float"]],
                     ["int64_t", ["CSRMatrix", "int64_t"]],
                     ["double", ["CSRMatrix", "int64_t"]],
                     ["float", ["CSRMatrix", "int64_t"]]
@@ -315,6 +316,7 @@
                     [["DenseMatrix", "size_t"], ["DenseMatrix", "int64_t"]],
 
                     [["DenseMatrix", "double"], ["CSRMatrix", "double"]],
+                    [["DenseMatrix", "float"], ["CSRMatrix", "float"]],
                     [["DenseMatrix", "int64_t"], ["CSRMatrix", "int64_t"]],
                     [["DenseMatrix", "float"], ["CSRMatrix", "int64_t"]],
                     [["DenseMatrix", "double"], ["CSRMatrix", "int64_t"]]
@@ -657,7 +659,10 @@
             [["ContiguousTensor", "uint8_t"], ["DenseMatrix", "uint8_t"]],
             [["ContiguousTensor", "int64_t"], ["DenseMatrix", "int64_t"]],
             [["ContiguousTensor", "int32_t"], ["DenseMatrix", "int32_t"]],
-            [["ContiguousTensor", "int8_t"], ["DenseMatrix", "int8_t"]]
+            [["ContiguousTensor", "int8_t"], ["DenseMatrix", "int8_t"]],
+
+            [["CSRMatrix","double"], ["CSRMatrix","float"]],
+            [["CSRMatrix","float"], ["CSRMatrix","double"]]
         ]
     },
     {
@@ -1445,7 +1450,10 @@
                     [["DenseMatrix", "uint64_t"], ["DenseMatrix", "uint64_t"], ["DenseMatrix", "uint64_t"]],
                     [["DenseMatrix", "size_t"], ["DenseMatrix", "size_t"], ["DenseMatrix", "size_t"]],
                     [["CSRMatrix", "double"], ["CSRMatrix", "double"], ["DenseMatrix", "double"]],
-                    [["CSRMatrix", "double"], ["CSRMatrix", "double"], ["CSRMatrix", "double"]]
+                    [["CSRMatrix", "double"], ["CSRMatrix", "double"], ["CSRMatrix", "double"]],
+                    [["CSRMatrix", "float"], ["CSRMatrix", "float"], ["DenseMatrix", "float"]],
+                    [["CSRMatrix", "float"], ["CSRMatrix", "float"], ["CSRMatrix", "float"]]
+
                 ],
                 "opCodes": ["ADD", "SUB", "MUL", "DIV", "POW", "LOG", "MOD", "EQ", "NEQ", "LT", "LE", "GT", "GE", "MIN", "MAX", "AND", "OR"]
             }
@@ -2797,7 +2805,8 @@
             [["DenseMatrix", "float"], "float"],
             [["DenseMatrix", "int64_t"], "int64_t"],
             [["DenseMatrix", "uint8_t"], "uint8_t"],
-            [["CSRMatrix", "double"], "double"]
+            [["CSRMatrix", "double"], "double"],
+            [["CSRMatrix", "int64_t"], "int64_t"]
         ]
     },
     {
@@ -2955,7 +2964,9 @@
             [["DenseMatrix", "double"]],
             [["DenseMatrix", "int64_t"]],
             [["DenseMatrix", "uint8_t"]],
+
             [["CSRMatrix", "double"]],
+
             [["ContiguousTensor", "double"]],
             [["ContiguousTensor", "float"]],
             [["ContiguousTensor", "int64_t"]],
@@ -2974,6 +2985,7 @@
             [["ChunkedTensor", "uint32_t"]],
             [["ChunkedTensor", "uint8_t"]],
             [["ChunkedTensor", "size_t"]],
+            [["CSRMatrix", "float"]],
             ["Frame"]
         ]
     },
@@ -3386,6 +3398,7 @@
                 "name":  ["CPP"],
                 "instantiations": [
                     [["CSRMatrix", "double"], ["CSRMatrix", "double"]],
+                    [["CSRMatrix", "float"], ["CSRMatrix", "float"]],
                     [["CSRMatrix", "int64_t"], ["CSRMatrix", "int64_t"]]]
             }
         ]
@@ -3739,6 +3752,7 @@
         },
         "instantiations": [
             [["DenseMatrix", "double"]],
+            [["DenseMatrix", "float"]],
             [["DenseMatrix", "int64_t"]],
             [["CSRMatrix", "double"]],
             [["CSRMatrix", "int64_t"]]
@@ -3806,7 +3820,8 @@
             [["DenseMatrix", "double"]],
             [["DenseMatrix", "float"]],
             [["DenseMatrix", "int64_t"]],
-            [["CSRMatrix", "double"]]
+            [["CSRMatrix", "double"]],
+            [["CSRMatrix", "float"]]
         ]
     },
     {
