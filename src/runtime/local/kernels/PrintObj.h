@@ -27,13 +27,13 @@
 /**
  * @brief Prints a data object to standard output.
  * 
- * Template paramter `DT` should be a sub-class of `Structure`, e.g.
- * `DenseMatrix`, `CSRMatrix`, or `Frame`.
+ * Template paramter `DT` should be a sub-class of `Structure`, e.g. `DenseMatrix`, `CSRMatrix`, `Frame`, or `Tensor`.
  * 
  * @param arg The data object to print.
  */
 template<class DT>
 void printObj(const DT * arg, [[maybe_unused]] bool newline, bool err, DCTX(ctx)) {
+    assert(arg != nullptr);
     arg->print(err ? std::cerr : std::cout);
 }
 
