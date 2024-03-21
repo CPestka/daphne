@@ -74,7 +74,7 @@ struct SliceTensor<ChunkedTensor<VT>, ChunkedTensor<VT>> {
         std::vector<std::pair<size_t, size_t>> index_ranges {{lowerInclX, upperExclX}, {lowerInclY, upperExclY}, {lowerInclZ, upperExclZ}};
 
         //TODO: use tryDice if id ranges dont match chunk boundaries and trsDiceAtChunkLevel otherwise
-        //res = arg->tryDice(index_ranges);
+        res = arg->tryDice(index_ranges, {1,1,1});
     }
 };
 

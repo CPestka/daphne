@@ -106,10 +106,6 @@ class ContiguousTensor : public Tensor<ValueType> {
         }
     };
 
-    // template<>
-    // ContiguousTensor(const ContiguousTensor<ValueType> *other)
-    //     : Tensor<ValueType>::Tensor(other->tensor_shape), strides(other->strides), data(other->data) {};
-
     ContiguousTensor(const DenseMatrix<ValueType> *other)
         : Tensor<ValueType>::Tensor(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
         strides = {1, other->getNumCols()};

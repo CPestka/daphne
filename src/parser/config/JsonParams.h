@@ -33,6 +33,7 @@ struct DaphneConfigJsonParams {
     inline static const std::string USE_MLIR_CODEGEN = "use_mlir_codegen";
     inline static const std::string CUDA_FUSE_ANY = "cuda_fuse_any";
     inline static const std::string VECTORIZED_SINGLE_QUEUE = "vectorized_single_queue";
+    inline static const std::string USE_PARTIAL_READS = "use_partial_reads";
 
     inline static const std::string DEBUG_LLVM = "debug_llvm";
     inline static const std::string EXPLAIN_KERNELS = "explain_kernels";
@@ -65,6 +66,7 @@ struct DaphneConfigJsonParams {
             USE_MLIR_CODEGEN,
             CUDA_FUSE_ANY,
             VECTORIZED_SINGLE_QUEUE,
+            USE_PARTIAL_READS,
             DEBUG_LLVM,
             EXPLAIN_KERNELS,
             EXPLAIN_LLVM,

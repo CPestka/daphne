@@ -57,6 +57,8 @@ void ConfigParser::readUserConfig(const std::string& filename, DaphneUserConfig&
         config.cuda_fuse_any = jf.at(DaphneConfigJsonParams::CUDA_FUSE_ANY).get<bool>();
     if (keyExists(jf, DaphneConfigJsonParams::VECTORIZED_SINGLE_QUEUE))
         config.vectorized_single_queue = jf.at(DaphneConfigJsonParams::VECTORIZED_SINGLE_QUEUE).get<bool>();
+    if (keyExists(jf, DaphneConfigJsonParams::USE_PARTIAL_READS))
+        config.use_partial_reads = jf.at(DaphneConfigJsonParams::USE_PARTIAL_READS).get<bool>();
     if (keyExists(jf, DaphneConfigJsonParams::DEBUG_LLVM))
         config.debug_llvm = jf.at(DaphneConfigJsonParams::DEBUG_LLVM).get<bool>();
     if (keyExists(jf, DaphneConfigJsonParams::EXPLAIN_KERNELS))
