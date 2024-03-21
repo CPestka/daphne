@@ -70,7 +70,6 @@ class ChunkedTensor : public Tensor<ValueType> {
 
     ChunkedTensor(const std::vector<size_t> &tensor_shape, const std::vector<size_t> &chunk_shape, InitCode init_code)
         : Tensor<ValueType>::Tensor(tensor_shape), chunk_shape(chunk_shape) {
-
         logger = spdlog::get("runtime::tensor");
 
         chunk_strides.resize(this->rank);
@@ -190,6 +189,7 @@ class ChunkedTensor : public Tensor<ValueType> {
           intra_chunk_strides(other->intra_chunk_strides), chunks_per_dim(other->chunks_per_dim),
           total_size_in_elements(other->total_size_in_elements), total_chunk_count(other->total_chunk_count),
           chunk_materialization_flags(std::make_unique<std::atomic<bool>[]>(total_chunk_count)) {
+        logger = spdlog::get("runtime::tensor");
         data = std::shared_ptr<ValueType[]>(new ValueType[total_size_in_elements], std::default_delete<ValueType[]>());
         //data = std::make_shared<ValueType[]>(total_size_in_elements);
         for (size_t i = 0; i < total_chunk_count; i++) {
@@ -228,6 +228,7 @@ class ChunkedTensor : public Tensor<ValueType> {
 
     ChunkedTensor(const DenseMatrix<ValueType> *matrix, size_t chunk_size_x, size_t chunk_size_y)
         : Tensor<ValueType>::Tensor(matrix->getNumRows(), matrix->getNumCols()) {
+        logger = spdlog::get("runtime::tensor");
         for(size_t i=0; i<this->rank; i++) {
             if ((this->tensor_shape[i] == 0) || chunk_shape[i] == 0)  {
                 logger->error("Tensors with dimensions of extent 0 are disallowed");
@@ -268,6 +269,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     // one with arbitrary chunking
     explicit ChunkedTensor(const ContiguousTensor<ValueType> *other)
         : Tensor<ValueType>::Tensor(other->tensor_shape), chunk_shape(other->tensor_shape) {
+        logger = spdlog::get("runtime::tensor");
         chunk_strides.resize(this->rank);
         intra_chunk_strides.resize(this->rank);
 
