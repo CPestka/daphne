@@ -72,15 +72,18 @@ void PartialReadPass::runOnOperation() {
     target.addLegalDialect<arith::ArithDialect, LLVM::LLVMDialect, scf::SCFDialect, daphne::DaphneDialect>();
 
     // if return val is false, rewrite
-    auto func = [](daphne::ReadOp op) { 
-        bool hasExactlyOneUse = (&op)->getResult().hasOneUse();
-        auto u = *((&op)->getResult().getUsers().begin());
-        bool isSlicingOp = llvm::dyn_cast<mlir::daphne::SliceTensorOp>(u);
+    auto func = [](daphne::ReadOp op) {
         bool isChunkedTensorType = false;
-        if (op.getResult().getType().isa<daphne::TensorType>()) {
+        if (!op.getResult().getType().isa<daphne::TensorType>()) {
+            // don't rewrite if we are not reading a tensor object
+            return true;
+        } else {
             daphne::TensorType type = op.getResult().getType().dyn_cast<daphne::TensorType>();
             isChunkedTensorType = type.getRepresentation() == daphne::TensorRepresentation::Chunked;
         }
+        bool hasExactlyOneUse = (&op)->getResult().hasOneUse();
+        auto u = *((&op)->getResult().getUsers().begin());
+        bool isSlicingOp = llvm::dyn_cast<mlir::daphne::SliceTensorOp>(u);
         return !(hasExactlyOneUse && isSlicingOp && isChunkedTensorType);
     };
 
