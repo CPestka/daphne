@@ -22,6 +22,7 @@
 #include <runtime/local/datastructures/Frame.h>
 #include <runtime/local/datastructures/ContiguousTensor.h>
 #include <runtime/local/datastructures/ChunkedTensor.h>
+#include <runtime/local/datastructures/Matrix.h>
 
 // ****************************************************************************
 // Struct for partial template specialization
@@ -50,6 +51,10 @@ template<class DT>
 bool checkEq(const DT * lhs, const DT * rhs, DCTX(ctx)) {
     return CheckEq<DT>::apply(lhs, rhs, ctx);
 };
+
+// ****************************************************************************
+// (Partial) template specializations for different data/value types
+// ****************************************************************************
 
 // ----------------------------------------------------------------------------
 // DenseMatrix
@@ -101,6 +106,17 @@ struct CheckEq<ContiguousTensor<VT>> {
 template<typename VT>
 struct CheckEq<ChunkedTensor<VT>> {
     static bool apply(const ChunkedTensor<VT> * lhs, const ChunkedTensor<VT> * rhs, DCTX(ctx)) {
+        return *lhs == *rhs;
+    }
+};
+
+// ----------------------------------------------------------------------------
+// Matrix
+// ----------------------------------------------------------------------------
+
+template<typename VT>
+struct CheckEq<Matrix<VT>> {
+    static bool apply(const Matrix<VT> * lhs, const Matrix<VT> * rhs, DCTX(ctx)) {
         return *lhs == *rhs;
     }
 };

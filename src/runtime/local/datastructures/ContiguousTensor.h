@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The DAPHNE Consortium
+ * Copyright 2024 The DAPHNE Consortium
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,13 @@
 #include <runtime/local/datastructures/Tensor.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
 
+/**
+*  @brief An implementation of a tensor with a contiguous, "row-major" memory layout
+*
+*  This tensor implementation is backed by a single allocation for its data. The elements of the tensor are placed
+*  within this in the "higher dimensional equivalent of row-major order".
+*
+*/
 template<typename ValueType>
 class ContiguousTensor : public Tensor<ValueType> {
     public:
@@ -38,7 +45,17 @@ class ContiguousTensor : public Tensor<ValueType> {
 
     std::shared_ptr<ValueType[]> data;
 
-    ContiguousTensor(const std::vector<size_t> &tensor_shape, InitCode init_code, ValueType min = 0, ValueType max = 1) : Tensor<ValueType>::Tensor(tensor_shape), data(std::make_shared<ValueType[]>(this->total_element_count)) {
+    private:
+    // Grant DataObjectFactory access to the private constructors and
+    // destructors.
+    template<class DataType, typename ... ArgTypes>
+    friend DataType * DataObjectFactory::create(ArgTypes ...);
+    template<class DataType>
+    friend void DataObjectFactory::destroy(const DataType * obj);
+
+    ContiguousTensor(const std::vector<size_t> &tensor_shape, InitCode init_code, ValueType min = 0, ValueType max = 1)
+        : Tensor<ValueType>::Tensor(tensor_shape),
+          data(std::make_shared<ValueType[]>(this->total_element_count)) {
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
@@ -55,8 +72,8 @@ class ContiguousTensor : public Tensor<ValueType> {
         }
 
         switch (init_code) {
-            case InitCode::NONE:
-                break;
+            case InitCode::NONE: {
+            } break;
             case InitCode::ZERO: {
                 for (size_t i = 0; i < this->total_element_count; i++) {
                     data.get()[i] = 0;
@@ -102,15 +119,15 @@ class ContiguousTensor : public Tensor<ValueType> {
             data = other->data;
         } else {
             data = std::make_shared<ValueType[]>(this->total_element_count);
-         for(size_t i=0; i<this->total_element_count; i++) {
-            data[i] = static_cast<ValueType>(other->data[i]);
-         }
+            for(size_t i=0; i<this->total_element_count; i++) {
+                data[i] = static_cast<ValueType>(other->data[i]);
+            }
         }
     };
 
     ContiguousTensor(const DenseMatrix<ValueType> *other)
         : Tensor<ValueType>::Tensor(other->getNumRows(), other->getNumCols()), data(other->getValuesSharedPtr()) {
-        strides = {1, other->getNumCols()};
+        strides = {1, other->getRowSkip()};
         for(size_t i=0; i<this->rank; i++) {
             if (this->tensor_shape[i] == 0) {
                 throw std::runtime_error("Tensors with dimensions of extend 0 are disallowed.");
@@ -181,6 +198,8 @@ class ContiguousTensor : public Tensor<ValueType> {
     ~ContiguousTensor() override = default;
 
     void printValue(std::ostream &os, ValueType val) const;
+    
+    public:
 
     bool operator==(const ContiguousTensor<ValueType> &rhs) const {
         if (this->tensor_shape != rhs.tensor_shape) {
@@ -343,7 +362,6 @@ class ContiguousTensor : public Tensor<ValueType> {
     }
 
     size_t serialize(std::vector<char> &buf) const override {
-        // TODO
-        return 0;
+        throw std::runtime_error("ContiguousTensor::serialize() is not supported (yet)");
     }
 };

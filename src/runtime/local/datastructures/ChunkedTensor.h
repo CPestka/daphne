@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The DAPHNE Consortium
+ * Copyright 2024 The DAPHNE Consortium
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/Tensor.h>
 #include <runtime/local/io/io_uring/AsyncUtil.h>
+#include <runtime/local/datastructures/ValueTypeUtils.h>
 
 struct AsyncIOInfo {
     std::atomic<IO_STATUS> status = IO_STATUS::PRE_SUBMISSION;
@@ -45,6 +46,37 @@ void ReverseArray(VT *data, uint64_t element_count) {
     }
 }
 
+/**
+* @brief A chunked tensor implementation
+*
+* This tensor implementation is backed by a single array of values. Compared to the ContiguousTensor for a chunked
+* tensor, a chunked tensor of rank N with a given shape (its size in each dimension) is further logically split into
+* chunks with its own, typically much smaller chunk_shape. In this implementation all chunks have the same chunk_shape.
+* Within the chunks the contained elements are arranged in the "higher dimensional equivalent of row-major" order, i.e.
+* in the same order as a equivalent ContiguosTensor with shape==chunk_shape.
+* The chunks themselves are then also arranged in "row-major" order. An alternative view of this memory layout is to 
+* interpret the initially rank N tensor as a 2N-1 rank tensor arranged in "row-major" order (with the "last" N
+* dimensions given by the chunk_shape and the first N-1 dimensions reduced in size by the corresponding factor).
+*
+* The two main advantages of this memory layout are:
+* 
+* 1. Fine grained and flexible control over the memory layout of the data structure by initially choosing a specific
+* chunk_shape or later on choosing to "rechunk" the tensor to a new chunk_shape.
+*
+* This allows the data structure layout to be adapted to the access pattern of specific kernels making their access
+* patterns potentially significantly more cache friendly, which is especially relevant for larger tensors. Typical
+* examples here are e.g. image processing kernels operating on 2D slices of a tensor with N >= 2 (smoothing, gradients,
+* lvl adjustments, etc.), reduce operations over dimensions that are not the primary dimension (a common example would 
+* be an averaging step over the time dimension) or e.g. solving higher dim differential equations over a grid.
+*
+* 2. Provides a convenient point to sensibly integrate async I/O and ideally also async processing, by loading individual
+*    chunks asynchronously and ideally starting to process them asynchronously as well, immediately after a chunk has
+*    been read rather than waiting for all chunks to arrive, i.e. block.
+*
+* While this implementation is already an improvement in respect to memory layout and the options for partial and/or 
+* async I/O and/or processing, the choice here to use a single allocation rather than individual allocations per chunk
+* limit its use to tensors that fit into memory and is potentially wasteful even for those which do.
+*/
 template<typename ValueType>
 class ChunkedTensor : public Tensor<ValueType> {
     public:
@@ -63,6 +95,14 @@ class ChunkedTensor : public Tensor<ValueType> {
     std::unique_ptr<AsyncIOInfo[]> chunk_io_futures;
 
     std::shared_ptr<ValueType[]> data;
+
+    private:
+    // Grant DataObjectFactory access to the private constructors and
+    // destructors.
+    template<class DataType, typename ... ArgTypes>
+    friend DataType * DataObjectFactory::create(ArgTypes ...);
+    template<class DataType>
+    friend void DataObjectFactory::destroy(const DataType * obj);
 
     ChunkedTensor(const std::vector<size_t> &tensor_shape, const std::vector<size_t> &chunk_shape, InitCode init_code)
         : Tensor<ValueType>::Tensor(tensor_shape), chunk_shape(chunk_shape) {
@@ -283,6 +323,8 @@ class ChunkedTensor : public Tensor<ValueType> {
     ~ChunkedTensor() override {};
 
     void printValue(std::ostream &os, ValueType val) const;
+    
+    public:
 
     bool operator==(const ChunkedTensor<ValueType> &rhs) const {
         if (this->tensor_shape != rhs.tensor_shape || chunk_shape != rhs.chunk_shape) {
@@ -1140,15 +1182,14 @@ class ChunkedTensor : public Tensor<ValueType> {
 
     // Prints elements in logical layout
     void print(std::ostream &os) const override {
-        os << "ChunkedTensor with shape: [";
+        os << "ChunkedTensor(";
         for (size_t i = 0; i < this->rank; i++) {
             os << this->tensor_shape[i];
             if (i != this->rank - 1) {
-                os << ",";
+                os << "x";
             }
         }
-        os << "]\n"
-           << "Elementtype: " << ValueTypeUtils::cppNameFor<ValueType> << std::endl;
+        os << ", " << ValueTypeUtils::cppNameFor<ValueType> << ")" << std::endl;
 
         if (this->rank == 0) {
             os << data.get()[0] << std::endl;
@@ -1184,8 +1225,7 @@ class ChunkedTensor : public Tensor<ValueType> {
     }
 
     size_t serialize(std::vector<char> &buf) const override {
-        // TODO
-        return 0;
+        throw std::runtime_error("ChunkedTensor::serialize() is not supported (yet)");
     }
 
     size_t getNumItems() const override {
