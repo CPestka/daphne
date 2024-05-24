@@ -171,6 +171,18 @@ public:
                 }
             }
         }
+        else if(auto tensTy = t.dyn_cast<mlir::daphne::TensorType>()) {
+            switch (tensTy.getRepresentation()) {
+                case mlir::daphne::TensorRepresentation::Chunked: {
+                    const std::string vtName = mlirTypeToCppTypeName(tensTy.getElementType(), angleBrackets, false);
+                    return angleBrackets ? ("ChunkedTensor<" + vtName + ">") : ("ChunkedTensor" + vtName);
+                }
+                case mlir::daphne::TensorRepresentation::Contiguous: {
+                    const std::string vtName = mlirTypeToCppTypeName(tensTy.getElementType(), angleBrackets, false);
+                    return angleBrackets ? ("ContiguousTensor<" + vtName + ">") : ("ContiguousTensor" + vtName);
+                }
+            }
+        }
         else if(llvm::isa<mlir::daphne::FrameType>(t))
             if(generalizeToStructure)
                 return "Structure";
@@ -235,7 +247,7 @@ public:
     }
     
     [[maybe_unused]] static bool isObjType(mlir::Type t) {
-        return llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>(t);
+        return llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType, mlir::daphne::TensorType>(t);
     }
     
     [[maybe_unused]] static bool hasObjType(mlir::Value v) {

@@ -130,6 +130,64 @@ def Matrix : Daphne_Type<"Matrix"> {
     }];
 }
 
+def Tensor : Daphne_Type<"Tensor"> {
+    let summary = "tensor";
+
+    // TODO Maybe we should rename "element type" to "value type" everywhere.
+    //let parameters = (ins "::mlir::Type":$elementType, "ssize_t":$numX, "ssize_t":$numY, "ssize_t":$numZ, "TensorRepresentation":$representation);
+    let parameters = (ins "::mlir::Type":$elementType, "std::vector<ssize_t>":$dims, "TensorRepresentation":$representation);
+    let genVerifyDecl = 1;
+    // NOTE: float needs special treatment for equality check and hashing (epsilon)
+    let genStorageClass = 0;
+
+    let builders = [
+        // Creates a TensorType from mere element type information, with all other parameters reset
+        TypeBuilder<(ins "::mlir::Type":$elementType), [{
+            return Base::get($_ctxt, elementType, std::vector<ssize_t>(), TensorRepresentation::Contiguous);
+        }]>,
+    ];
+
+    let extraClassDeclaration = [{
+        // The following methods return a TensorType with the same parameters as this TensorType, except for one parameter, which is replaced by a new value.
+
+        ssize_t getNumDim() const;
+
+        ::mlir::daphne::TensorType withElementType(::mlir::Type elementType) {
+            return get(getContext(), elementType, getDims(), getRepresentation());
+        }
+
+        ::mlir::daphne::TensorType withShape(const std::vector<ssize_t> dims) {
+            return get(getContext(), getElementType(), dims, getRepresentation());
+        }
+
+        ::mlir::daphne::TensorType withRepresentation(::mlir::daphne::TensorRepresentation rep) {
+            return get(getContext(), getElementType(), getDims(), rep);
+        }
+
+        // The following methods return a TensorType preserving the specified
+        // properties and resetting all others.
+
+        ::mlir::daphne::TensorType withSameElementType() {
+            return get(getContext(), getElementType());
+        }
+
+        ::mlir::daphne::TensorType withSameElementTypeAndRepr() {
+            return get(getContext(), getElementType(), {}, getRepresentation());
+        }
+
+        /**
+         * @brief Check if `other` has strictly less information than this matrix type.
+         * @param other the other matrix type to compare to
+         * @return true if this type has more information, false otherwise
+         */
+        bool isSpecializationOf(::mlir::daphne::TensorType other) {
+            if (!other.getElementType().isa<mlir::daphne::UnknownType>() && getElementType() != other.getElementType())
+                return false;
+            return true;
+        }
+    }];
+}
+
 // TODO We could omit the "Of" and have it default to ScalarType.
 // A type constraint checking if a type is a matrix whose value type is one of
 // the given types (whereby Unknown is always allowed automatically).
@@ -221,10 +279,12 @@ def Frame : Daphne_Type<"Frame"> {
 }
 
 def MatrixOrFrame : AnyTypeOf<[Matrix, Frame, Unknown]>;
+def MatrixOrFrameOrTensor : AnyTypeOf<[Matrix, Frame, Tensor, Unknown]>;
 // TODO It would be great to get rid of the "unknown" in the names. Ideally, we
 // would like to allow unknown without explicitly specifying it.
 def MatrixOrU : AnyTypeOf<[Matrix, Unknown]>;
 def FrameOrU : AnyTypeOf<[Frame, Unknown]>;
+def TensorOrU : AnyTypeOf<[Tensor, Unknown]>;
 
 // ****************************************************************************
 // Distributed types

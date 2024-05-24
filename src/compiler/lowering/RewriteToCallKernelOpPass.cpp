@@ -60,6 +60,8 @@ namespace
                 return 3;
             if(llvm::isa<daphne::CreateFrameOp, daphne::SetColLabelsOp>(op))
                 return 2;
+            if (llvm::isa<daphne::RandTensorOp>(op))
+                return 3;
             if(llvm::isa<daphne::DistributedComputeOp>(op))
                 return 1;
 
@@ -84,6 +86,11 @@ namespace
                         idxAndLen.second,
                         isVariadic[index]
                 );
+            }
+            if(auto concreteOp = llvm::dyn_cast<daphne::RandTensorOp>(op)) {
+                auto idxAndLen = concreteOp.getODSOperandIndexAndLength(index);
+                static bool isVariadic[] = {true, false, false};
+                return std::make_tuple(idxAndLen.first, idxAndLen.second, isVariadic[index]);
             }
             if(auto concreteOp = llvm::dyn_cast<daphne::SetColLabelsOp>(op)) {
                 auto idxAndLen = concreteOp.getODSOperandIndexAndLength(index);
@@ -152,6 +159,8 @@ namespace
                 return mlir::daphne::StructureType::get(mctx);
             if(auto mt = t.dyn_cast<mlir::daphne::MatrixType>())
                 return mt.withSameElementTypeAndRepr();
+            if(auto tt = t.dyn_cast<mlir::daphne::TensorType>())
+                return tt.withSameElementTypeAndRepr();
             if(t.isa<mlir::daphne::FrameType>())
                 return mlir::daphne::FrameType::get(mctx, {mlir::daphne::UnknownType::get(mctx)});
             if(auto mrt = t.dyn_cast<mlir::MemRefType>())
@@ -232,6 +241,7 @@ namespace
                 llvm::isa<daphne::NumColsOp>(op) ||
                 llvm::isa<daphne::NumRowsOp>(op) ||
                 llvm::isa<daphne::IncRefOp>(op) ||
+                llvm::isa<daphne::RandTensorOp>(op) ||
                 llvm::isa<daphne::DecRefOp>(op);
 
             // Append converted op result types to the look-up result types.

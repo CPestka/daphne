@@ -944,6 +944,11 @@ void DaphneLowerToLLVMPass::runOnOperation()
         return LLVM::LLVMPointerType::get(
                 IntegerType::get(t.getContext(), 1));
     });
+    typeConverter.addConversion([&](daphne::TensorType t)
+    {
+        return LLVM::LLVMPointerType::get(
+                IntegerType::get(t.getContext(), 1));
+    });
     typeConverter.addConversion([&](daphne::StringType t)
     {
         return LLVM::LLVMPointerType::get(

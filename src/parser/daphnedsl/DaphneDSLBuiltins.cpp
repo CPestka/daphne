@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
+
 #include <compiler/utils/CompilerUtils.h>
 #include <ir/daphneir/Daphne.h>
 #include <parser/daphnedsl/DaphneDSLBuiltins.h>
@@ -27,6 +29,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include <spdlog/spdlog.h>
 
 #include <cstdlib>
 
@@ -410,6 +414,22 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
                 numRows, numCols, min, max, sparsity, seed
         ));
     }
+
+    if (func == "randTensor") {
+        std::shared_ptr<spdlog::logger> logger = spdlog::get("parser");
+        checkNumArgsBetween(loc, func, numArgs, 3, 7);
+        SPDLOG_LOGGER_DEBUG(logger, "NumArgs: {}", numArgs);
+
+        std::vector<mlir::Value> shapes;
+        // strip of last two arguments and use the rest to derive the tensor shape
+        for (size_t i = 0; i < numArgs - 2; ++i) {
+            shapes.push_back(utils.castSizeIf(args[i]));
+        }
+        mlir::Value min = args[numArgs - 2];
+        mlir::Value max = args[numArgs - 1];
+        return static_cast<mlir::Value>(builder.create<RandTensorOp>(loc, TensorType::get(builder.getContext(), min.getType()), shapes, min, max));
+    }
+
     if(func == "sample") {
         checkNumArgsExact(loc, func, numArgs, 4);
         mlir::Value range = args[0];
@@ -446,6 +466,8 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string & f
         return createNumOp<NumColsOp>(loc, func, args);
     if(func == "ncell")
         return createNumOp<NumCellsOp>(loc, func, args);
+    if(func == "ndims")
+        return createNumOp<NumDimsOp>(loc, func, args);
 
     // ********************************************************************
     // Elementwise unary

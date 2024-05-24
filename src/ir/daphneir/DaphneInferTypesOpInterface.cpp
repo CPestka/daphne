@@ -210,6 +210,16 @@ std::vector<Type> daphne::RandMatrixOp::inferTypes() {
     return {daphne::MatrixType::get(getContext(), elTy)};
 }
 
+std::vector<Type> daphne::RandTensorOp::inferTypes() {
+    auto elTy = getMin().getType();
+    if (elTy == UnknownType::get(getContext())) {
+        elTy = getMax().getType();
+    } else {
+        assert((getMax().getType() == UnknownType::get(getContext()) || elTy == getMax().getType()) && "Min and max need to have the same type");
+    }
+    return {daphne::TensorType::get(getContext(), elTy)};
+}
+
 std::vector<Type> daphne::EigenOp::inferTypes() {
     auto evMatType = getArg().getType().dyn_cast<daphne::MatrixType>();
     return  {evMatType.withSameElementType(), evMatType};

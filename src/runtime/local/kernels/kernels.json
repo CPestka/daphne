@@ -2302,6 +2302,11 @@
             [["CSRMatrix", "float"]],
             [["CSRMatrix", "int64_t"]],
             [["CSRMatrix", "uint8_t"]],
+            [["ContiguousTensor", "double"]],
+            [["ContiguousTensor", "float"]],
+            [["ContiguousTensor", "int64_t"]],
+            [["ContiguousTensor", "uint64_t"]],
+            [["ContiguousTensor", "uint8_t"]],
             ["Frame"],
             ["char"]
         ]
@@ -2359,6 +2364,53 @@
             [["DenseMatrix", "uint8_t"], "uint8_t"],
             [["CSRMatrix", "double"], "double"],
             [["CSRMatrix", "int64_t"], "int64_t"]
+        ]
+    },
+    {
+        "kernelTemplate": {
+            "header": "RandTensor.h",
+            "opName": "randTensor",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                },
+                {
+                    "name": "VTArg",
+                    "isDataType": false
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "DTRes *&",
+                    "name": "res"
+                },
+                {
+                    "type": "size_t *",
+                    "name": "dim",
+                    "isVariadic": true
+                },
+                {
+                    "type": "size_t",
+                    "name": "numDims"
+                },
+                {
+                    "type": "VTArg",
+                    "name": "min"
+                },
+                {
+                    "type": "VTArg",
+                    "name": "max"
+                }
+            ]
+        },
+        "instantiations": [
+            [["ContiguousTensor", "double"], "double"],
+            [["ContiguousTensor", "float"], "float"],
+            [["ContiguousTensor", "int64_t"], "int64_t"],
+            [["ContiguousTensor", "uint64_t"], "uint64_t"],
+            [["ContiguousTensor", "uint8_t"], "uint8_t"]
         ]
     },
     {

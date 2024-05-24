@@ -134,7 +134,7 @@ namespace {
  */
 class InferencePass : public PassWrapper<InferencePass, OperationPass<func::FuncOp>> {
     daphne::InferenceConfig cfg;
-
+    std::shared_ptr<spdlog::logger> logger;
     /**
      * @brief Sets all properties of all results of the given operation to unknown
      * to undo any prior property inference.
@@ -149,6 +149,8 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                 t = mt.withSameElementType();
             else if(auto ft = t.dyn_cast<daphne::FrameType>())
                 t = ft.withSameColumnTypes();
+            else if(auto tt = t.dyn_cast<daphne::TensorType>())
+                t = tt.withSameElementType();
             op->getResult(i).setType(t);
         }
         return WalkResult::advance();
@@ -193,7 +195,7 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
             }
             if (cfg.shapeInference && returnsUnknownShape(op)) {
                 // Try to infer the shapes of all results of this operation.
-                std::vector<std::pair<ssize_t, ssize_t>> shapes = daphne::tryInferShape(op);
+                auto shapes = daphne::tryInferShape(op);
                 const size_t numRes = op->getNumResults();
                 if (shapes.size() != numRes) {
                     throw ErrorHandler::compilerError(
@@ -208,8 +210,8 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                 for(size_t i = 0 ; i < numRes ; i++) {
                     if(llvm::isa<mlir::daphne::MatrixType>(op->getResultTypes()[i]) ||
                        llvm::isa<mlir::daphne::FrameType>(op->getResultTypes()[i])) {
-                        const ssize_t numRows = shapes[i].first;
-                        const ssize_t numCols = shapes[i].second;
+                        const ssize_t numRows = (shapes[i])[0];
+                        const ssize_t numCols = (shapes[i])[1];
                         Value rv = op->getResult(i);
                         const Type rt = rv.getType();
                         if (auto mt = rt.dyn_cast<daphne::MatrixType>())
@@ -223,6 +225,16 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                                     " operand " + std::to_string(i) + ", since it "
                                                                         "is neither a matrix nor a frame"
                             );
+                    } else if (llvm::isa<mlir::daphne::TensorType>(op->getResultTypes()[i])) {
+                        Value rv = op->getResult(i);
+                        const Type rt = rv.getType();
+                        if (auto tt = rt.dyn_cast<daphne::TensorType>()) {
+                            const ssize_t numX = (shapes[i])[0];
+                            const ssize_t numY = (shapes[i])[1];
+                            const ssize_t numZ = (shapes[i])[2];
+                            //logger->debug("Setting shape for {}D-tensor: <{},{},{}>!", shapes[i].size(), numX, numY, numZ);
+                            rv.setType(tt.withShape(shapes[i]));
+                        }
                     }
                 }
             }
@@ -487,7 +499,9 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
     };
 
 public:
-    InferencePass(daphne::InferenceConfig cfg) : cfg(cfg) {}
+    InferencePass(daphne::InferenceConfig cfg) : cfg(cfg) {
+        logger = spdlog::get("compiler");
+    }
 
     void runOnOperation() override {
         func::FuncOp f = getOperation();
@@ -513,6 +527,8 @@ public:
                 for(Type ct : ft.getColumnTypes())
                     if(llvm::isa<daphne::UnknownType>(ct))
                         return true;
+            if (auto tt = resType.dyn_cast<daphne::TensorType>())
+                return llvm::isa<daphne::UnknownType>(tt.getElementType());
             return false;
         });
     }
@@ -530,6 +546,9 @@ public:
                 return mt.getNumRows() == -1 || mt.getNumCols() == -1;
             if(auto ft = rt.dyn_cast<daphne::FrameType>())
                 return ft.getNumRows() == -1 || ft.getNumCols() == -1;
+            if (auto tt = rt.dyn_cast<daphne::TensorType>()) {
+                return (tt.getDims().size() == 0);
+            }
             return false;
         });
     }

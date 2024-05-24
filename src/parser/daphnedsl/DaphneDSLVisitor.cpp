@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
+
 #include <compiler/utils/CompilerUtils.h>
 #include <util/ErrorHandler.h>
 #include <compiler/utils/TypePrinting.h>
@@ -65,10 +67,7 @@ void DaphneDSLVisitor::handleAssignmentPart(mlir::Location loc,
                 " before a value has been assigned to it");
         mlir::Value obj = symbolTable.get(var).value;
 
-        auto indexing = visit(idxCtx).as<std::pair<
-                std::pair<bool, antlrcpp::Any>,
-                std::pair<bool, antlrcpp::Any>
-        >>();
+        auto indexing = visit(idxCtx).as<std::pair<std::pair<bool, antlrcpp::Any>, std::pair<bool, antlrcpp::Any>>>();
         auto rows = indexing.first;
         auto cols = indexing.second;
 
@@ -109,17 +108,15 @@ void DaphneDSLVisitor::handleAssignmentPart(mlir::Location loc,
 
 template<class ExtractAxOp, class SliceAxOp, class NumAxOp>
 mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value arg, antlrcpp::Any ax, bool allowLabel) {
+    SPDLOG_LOGGER_DEBUG(logger, "applyRightIndexing");
     if(ax.is<mlir::Value>()) { // indexing with a single SSA value (no ':')
+        SPDLOG_LOGGER_DEBUG(logger, "indexing with a single SSA value (no ':')");
         mlir::Value axVal = ax.as<mlir::Value>();
         if(CompilerUtils::hasObjType(axVal)) // data object
-            return utils.retValWithInferedType(
-                    builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal)
-            );
+            return utils.retValWithInferedType(builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal));
         else if(llvm::isa<mlir::daphne::StringType>(axVal.getType())) { // string
             if(allowLabel)
-                return utils.retValWithInferedType(
-                        builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal)
-                );
+                return utils.retValWithInferedType(builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal));
             else
             throw ErrorHandler::compilerError(
                 loc, "DSLVisitor (applyRightIndexing)",
@@ -143,6 +140,7 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
             );
     }
     else if(ax.is<std::pair<mlir::Value, mlir::Value>>()) { // indexing with a range (':')
+        SPDLOG_LOGGER_DEBUG(logger, "indexing with a range (':')");
         auto axPair = ax.as<std::pair<mlir::Value, mlir::Value>>();
         auto axLowerIncl = axPair.first;
         auto axUpperExcl = axPair.second;
@@ -169,25 +167,19 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
 
 template<class InsertAxOp, class NumAxOp>
 mlir::Value DaphneDSLVisitor::applyLeftIndexing(mlir::Location loc, mlir::Value arg, mlir::Value ins, antlrcpp::Any ax, bool allowLabel) {
+    SPDLOG_LOGGER_DEBUG(logger, "applyLeftIndexing");
     mlir::Type argType = arg.getType();
 
     if(ax.is<mlir::Value>()) { // indexing with a single SSA value (no ':')
         mlir::Value axVal = ax.as<mlir::Value>();
         if(CompilerUtils::hasObjType(axVal)) // data object
-            throw ErrorHandler::compilerError(
-                loc, "DSLVisitor (applyLeftIndexing)",
-                "left indexing with positions as a data object is not supported (yet)");
+            throw ErrorHandler::compilerError(loc, "DSLVisitor (applyLeftIndexing)", "left indexing with positions as a data object is not supported (yet)");
         else if(llvm::isa<mlir::daphne::StringType>(axVal.getType())) { // string
             if(allowLabel)
                 // TODO Support this (#239).
-                throw ErrorHandler::compilerError(
-                loc, "DSLVisitor (applyLeftIndexing)",
-                "left indexing by label is not supported yet");
+                throw ErrorHandler::compilerError(loc, "DSLVisitor (applyLeftIndexing)","left indexing by label is not supported yet");
             else
-                throw ErrorHandler::compilerError(
-                loc, "DSLVisitor (applyLeftIndexing)",
-                "cannot use left indexing with label in this case"
-                );
+                throw ErrorHandler::compilerError(loc, "DSLVisitor (applyLeftIndexing)","cannot use left indexing with label in this case");
         }
         else // scalar
             return static_cast<mlir::Value>(
@@ -198,9 +190,7 @@ mlir::Value DaphneDSLVisitor::applyLeftIndexing(mlir::Location loc, mlir::Value 
                                     builder.create<mlir::daphne::EwAddOp>(
                                             loc, builder.getIntegerType(64, false),
                                             utils.castSI64If(axVal),
-                                            builder.create<mlir::daphne::ConstantOp>(
-                                                    loc, static_cast<int64_t>(1)
-                                            )
+                                            builder.create<mlir::daphne::ConstantOp>(loc, static_cast<int64_t>(1))
                                     )
                             )
                     )
@@ -217,13 +207,7 @@ mlir::Value DaphneDSLVisitor::applyLeftIndexing(mlir::Location loc, mlir::Value 
         if(axUpperExcl == nullptr)
             axUpperExcl = builder.create<NumAxOp>(loc, utils.sizeType, arg);
 
-        return static_cast<mlir::Value>(
-                builder.create<InsertAxOp>(
-                        loc, argType, arg, ins,
-                        utils.castSI64If(axLowerIncl),
-                        utils.castSI64If(axUpperExcl)
-                )
-        );
+        return static_cast<mlir::Value>(builder.create<InsertAxOp>(loc, argType, arg, ins, utils.castSI64If(axLowerIncl), utils.castSI64If(axUpperExcl)));
     }
     else
         throw ErrorHandler::compilerError(
@@ -1183,36 +1167,31 @@ antlrcpp::Any DaphneDSLVisitor::visitRightIdxFilterExpr(DaphneDSLGrammarParser::
 }
 
 antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser::RightIdxExtractExprContext * ctx) {
+    SPDLOG_LOGGER_DEBUG(logger, "visitRightIdxExtractExpr");
     mlir::Value obj = utils.valueOrError(visit(ctx->obj));
 
-    auto indexing = visit(ctx->idx).as<std::pair<
-            std::pair<bool, antlrcpp::Any>,
-            std::pair<bool, antlrcpp::Any>
-    >>();
-    auto rows = indexing.first;
-    auto cols = indexing.second;
+    auto indexing = visit(ctx->idx).as<std::vector<std::pair<bool, antlrcpp::Any>>>();
+    SPDLOG_LOGGER_DEBUG(logger, "visitRightIdxExtractExpr: {}", indexing.size());
 
-    // TODO Use location of rows/cols in utils.getLoc(...) for better
-    // error messages.
-    if(rows.first) // rows specified
-        obj = applyRightIndexing<
-                mlir::daphne::ExtractRowOp,
-                mlir::daphne::SliceRowOp,
-                mlir::daphne::NumRowsOp
-        >(utils.getLoc(ctx->idx->start), obj, rows.second, false);
-    if(cols.first) // cols specified
-        obj = applyRightIndexing<
-                mlir::daphne::ExtractColOp,
-                mlir::daphne::SliceColOp,
-                mlir::daphne::NumColsOp
-        >(utils.getLoc(ctx->idx->start), obj, cols.second, llvm::isa<mlir::daphne::FrameType>(obj.getType()));
+    // TODO Use location of rows/cols in utils.getLoc(...) for better error messages.
+    // rows specified
+    if (indexing.size() > 0 && indexing[0].first) {
+        SPDLOG_LOGGER_DEBUG(logger, "visitRightIdxExtractExpr has rows");
+        auto rows = indexing[0];
+        obj = applyRightIndexing<mlir::daphne::ExtractRowOp, mlir::daphne::SliceRowOp, mlir::daphne::NumRowsOp>(utils.getLoc(ctx->idx->start), obj, rows.second, false);
+    }
+    // cols specified
+    if (indexing.size() > 1 && indexing[1].first) {
+        SPDLOG_LOGGER_DEBUG(logger, "visitRightIdxExtractExpr has columns");
+        auto cols = indexing[1];
+        obj = applyRightIndexing<mlir::daphne::ExtractColOp, mlir::daphne::SliceColOp, mlir::daphne::NumColsOp>(utils.getLoc(ctx->idx->start), obj, cols.second, llvm::isa<mlir::daphne::FrameType>(obj.getType()));
+    }
 
     // Note: If rows and cols are specified, we create two extraction steps.
     // This can be inefficient, but it is simpler for now.
     // TODO Create a combined ExtractOp/SliceOp.
 
-    // Note: If neither rows nor cols are specified, we simply return the
-    // object.
+    // Note: If neither rows nor cols are specified, we simply return the object.
 
     return obj;
 }
@@ -1418,25 +1397,25 @@ antlrcpp::Any DaphneDSLVisitor::visitMatrixLiteralExpr(DaphneDSLGrammarParser::M
 }
 
 antlrcpp::Any DaphneDSLVisitor::visitIndexing(DaphneDSLGrammarParser::IndexingContext * ctx) {
-    auto rows = ctx->rows
-            ? visit(ctx->rows).as<std::pair<bool, antlrcpp::Any>>()
-            : std::make_pair(false, antlrcpp::Any(nullptr));
-    auto cols = ctx->cols
-            ? visit(ctx->cols).as<std::pair<bool, antlrcpp::Any>>()
-            : std::make_pair(false, antlrcpp::Any(nullptr));
-    return std::make_pair(rows, cols);
+    SPDLOG_LOGGER_DEBUG(logger, "visitIndexing: {}", ctx->range().size());
+    // auto rows = ctx->rows ? visit(ctx->rows).as<std::pair<bool, antlrcpp::Any>>() : std::make_pair(false, antlrcpp::Any(nullptr));
+    // auto cols = ctx->cols ? visit(ctx->cols).as<std::pair<bool, antlrcpp::Any>>() : std::make_pair(false, antlrcpp::Any(nullptr));
+    // return std::make_pair(rows, cols);
+    std::vector<std::pair<bool, antlrcpp::Any>> ranges;
+    for (size_t i = 0; i < ctx->range().size(); ++i) {
+        ranges.push_back(ctx->range(i) ? visit(ctx->range(i)).as<std::pair<bool, antlrcpp::Any>>() : std::make_pair(false, antlrcpp::Any(nullptr)));
+    }
+    return ranges;
 }
 
 antlrcpp::Any DaphneDSLVisitor::visitRange(DaphneDSLGrammarParser::RangeContext * ctx) {
+    SPDLOG_LOGGER_DEBUG(logger, "visitRange ({},{},{})", ctx->pos ? "NOT NULL" : "NULL", ctx->posLowerIncl ? "NOT NULL" : "NULL", ctx->posUpperExcl ? "NOT NULL" : "NULL");
     if(ctx->pos)
         return std::make_pair(true, antlrcpp::Any(utils.valueOrError(visit(ctx->pos))));
     else {
         mlir::Value posLowerIncl = ctx->posLowerIncl ? utils.valueOrError(visit(ctx->posLowerIncl)) : nullptr;
         mlir::Value posUpperExcl = ctx->posUpperExcl ? utils.valueOrError(visit(ctx->posUpperExcl)) : nullptr;
-        return std::make_pair(
-                posLowerIncl != nullptr || posUpperExcl != nullptr,
-                antlrcpp::Any(std::make_pair(posLowerIncl, posUpperExcl))
-        );
+        return std::make_pair(posLowerIncl != nullptr || posUpperExcl != nullptr, antlrcpp::Any(std::make_pair(posLowerIncl, posUpperExcl)));
     }
 }
 

@@ -139,6 +139,16 @@ def Daphne_RandMatrixOp : Daphne_Op<"randMatrix", [
     let results = (outs MatrixOrU:$res);
 }
 
+def Daphne_RandTensorOp : Daphne_Op<"randTensor", [
+    TypesMatchWith<"min and max arguments must be of the same type", "min", "max", "$_self">,
+    DeclareOpInterfaceMethods<InferTypesOpInterface>,
+    DeclareOpInterfaceMethods<InferShapeOpInterface>,
+    CastArgsToResTypeRandTensorOp
+]> {
+    let arguments = (ins Variadic<Size>:$shapes, AnyScalar:$min, AnyScalar:$max);
+    let results = (outs TensorOrU:$res);
+}
+
 def Daphne_SampleOp : Daphne_Op<"sample", [
     DataTypeMat, ValueTypeFromFirstArg,
     NumRowsFromIthScalar<1>, OneCol
@@ -173,6 +183,7 @@ class Daphne_NumOp<string name, list<Trait> traits = []> : Daphne_Op<name, !list
 def Daphne_NumRowsOp : Daphne_NumOp<"numRows">;
 def Daphne_NumColsOp : Daphne_NumOp<"numCols">;
 def Daphne_NumCellsOp : Daphne_NumOp<"numCells">;
+def Daphne_NumDimsOp : Daphne_NumOp<"numDims">;
 
 // ****************************************************************************
 // Matrix multiplication
@@ -1331,7 +1342,7 @@ def Daphne_PrintOp : Daphne_Op<"print"> {
     // TODO We might change it to only accept scalars here and enforce toString
     // for matrices and frames. But currently, we need it like that for the
     // rest of the program.
-    let arguments = (ins AnyTypeOf<[AnyScalar, MatrixOrFrame, AnyMemRef, Unknown]>:$arg, BoolScalar:$newline, BoolScalar:$err);
+    let arguments = (ins AnyTypeOf<[AnyScalar, MatrixOrFrameOrTensor, AnyMemRef, Unknown]>:$arg, BoolScalar:$newline, BoolScalar:$err);
     let results = (outs); // no results
 }
 

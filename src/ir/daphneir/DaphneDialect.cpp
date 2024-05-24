@@ -58,6 +58,9 @@
 #include <llvm/ADT/APSInt.h>
 #include <llvm/ADT/DenseMap.h>
 
+#include <spdlog/spdlog.h>
+#include <iostream>
+
 struct DaphneInlinerInterface : public mlir::DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
@@ -214,6 +217,9 @@ mlir::Type mlir::daphne::DaphneDialect::parseType(mlir::DialectAsmParser &parser
                 parser.getBuilder().getContext(), cts, numRows, numCols, nullptr
         );
     }
+    else if (keyword == "Tensor") {
+        spdlog::info("Got type tensor!");
+    }
     else if (keyword == "Handle") {
         mlir::Type dataType;
         if (parser.parseLess() || parser.parseType(dataType) || parser.parseGreater()) {
@@ -288,6 +294,14 @@ void mlir::daphne::DaphneDialect::printType(mlir::Type type,
         else
             os << '?';
         os << '>';
+    }
+    else if (auto t = type.dyn_cast<mlir::daphne::TensorType>()) {
+        os << "Tensor<" ;
+        auto dims = t.getDims();
+        for (size_t i = 0; i < t.getDims().size(); ++i) {
+            os << unknownStrIf(dims[i]) << 'x';
+        }
+        os << t.getElementType() << '>';
     }
     else if (auto handle = type.dyn_cast<mlir::daphne::HandleType>()) {
         os << "Handle<" << handle.getDataType() << ">";
@@ -394,6 +408,47 @@ namespace mlir::daphne {
     MatrixRepresentation MatrixType::getRepresentation() const { return getImpl()->representation; }
 }
 
+namespace mlir::daphne {
+    namespace detail {
+        struct TensorTypeStorage : public ::mlir::TypeStorage {
+            TensorTypeStorage(::mlir::Type elementType, std::vector<ssize_t> dims, TensorRepresentation representation)
+                : elementType(elementType), dims(dims), representation(representation) {}
+
+            /// The hash key is a tuple of the parameter types.
+            using KeyTy = std::tuple<::mlir::Type, std::vector<ssize_t>, TensorRepresentation>;
+            bool operator==(const KeyTy &tblgenKey) const {
+                if (!(elementType == std::get<0>(tblgenKey)))
+                    return false;
+                if (dims.size() != std::get<1>(tblgenKey).size())
+                    return false;
+                if (representation != std::get<2>(tblgenKey))
+                    return false;
+                return true;
+            }
+            static ::llvm::hash_code hashKey(const KeyTy &tblgenKey) {
+                return ::llvm::hash_combine(std::get<0>(tblgenKey),
+                    std::get<2>(tblgenKey));
+            }
+
+            /// Define a construction method for creating a new instance of this
+            /// storage.
+            static TensorTypeStorage *construct(::mlir::TypeStorageAllocator &allocator, const KeyTy &tblgenKey) {
+                auto elementType = std::get<0>(tblgenKey);
+                auto dims = std::get<1>(tblgenKey);
+                auto representation = std::get<2>(tblgenKey);
+                return new(allocator.allocate<TensorTypeStorage>()) TensorTypeStorage(elementType, dims, representation);
+            }
+            ::mlir::Type elementType;
+            std::vector<ssize_t> dims;
+            TensorRepresentation representation;
+        };
+    }
+    ::mlir::Type TensorType::getElementType() const { return getImpl()->elementType; }
+    std::vector<ssize_t> TensorType::getDims() const { return getImpl()->dims; }
+    TensorRepresentation TensorType::getRepresentation() const { return getImpl()->representation; }
+    ssize_t TensorType::getNumDim() const { return getImpl()->dims.size(); }
+}
+
 mlir::OpFoldResult mlir::daphne::ConstantOp::fold(FoldAdaptor adaptor)
 {
     assert(adaptor.getOperands().empty() && "constant has no operands");
@@ -467,6 +522,11 @@ mlir::OpFoldResult mlir::daphne::ConstantOp::fold(FoldAdaptor adaptor)
     }
     else
         return emitError() << "only matrix type is supported for handle atm, got: " << dataType;
+}
+
+::mlir::LogicalResult mlir::daphne::TensorType::verify(::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError, Type elementType, std::vector<ssize_t> dims, TensorRepresentation representation)
+{
+    return mlir::success();
 }
 
 mlir::LogicalResult mlir::daphne::VectorizedPipelineOp::canonicalize(mlir::daphne::VectorizedPipelineOp op,
@@ -1132,6 +1192,29 @@ mlir::LogicalResult mlir::daphne::NumCellsOp::canonicalize(
         rewriter.replaceOpWithNewOp<mlir::daphne::ConstantOp>(
                 op, rewriter.getIndexType(), rewriter.getIndexAttr(numRows * numCols)
         );
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
+/**
+ * @brief Replaces NumDimsOp by a constant, if the #rows and #cols of the
+ * input is known (e.g., due to shape inference).
+ */
+mlir::LogicalResult mlir::daphne::NumDimsOp::canonicalize(mlir::daphne::NumDimsOp op, PatternRewriter &rewriter) {
+    ssize_t numDims = -1;
+
+    mlir::Type inTy = op.getArg().getType();
+    if (auto t = inTy.dyn_cast<mlir::daphne::TensorType>()) {
+        numDims = t.getNumDim();
+    }
+
+    if (inTy.dyn_cast<mlir::daphne::MatrixType>() || inTy.dyn_cast<mlir::daphne::FrameType>()) {
+        numDims = 2;
+    }
+
+    if (numDims > 0) {
+        rewriter.replaceOpWithNewOp<mlir::daphne::ConstantOp>(op, rewriter.getIndexType(), rewriter.getIndexAttr(numDims));
         return mlir::success();
     }
     return mlir::failure();

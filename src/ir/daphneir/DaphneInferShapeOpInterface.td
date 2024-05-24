@@ -28,7 +28,7 @@ def InferShapeOpInterface : OpInterface<"InferShape"> {
     let methods = [
         InterfaceMethod<
                 "Infer the shape(s) the output data object(s).",
-                "std::vector<std::pair<ssize_t, ssize_t>>", "inferShape", (ins)
+                "std::vector<std::vector<ssize_t>>", "inferShape", (ins)
         >
     ];
 }

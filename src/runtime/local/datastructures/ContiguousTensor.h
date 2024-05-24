@@ -25,6 +25,7 @@
 #include <type_traits>
 #include <vector>
 #include <optional>
+#include <random>
 
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/Tensor.h>
@@ -37,9 +38,7 @@ class ContiguousTensor : public Tensor<ValueType> {
 
     std::shared_ptr<ValueType[]> data;
 
-    ContiguousTensor(const std::vector<size_t> &tensor_shape, InitCode init_code)
-        : Tensor<ValueType>::Tensor(tensor_shape),
-          data(std::make_shared<ValueType[]>(this->total_element_count)) {
+    ContiguousTensor(const std::vector<size_t> &tensor_shape, InitCode init_code, ValueType min = 0, ValueType max = 1) : Tensor<ValueType>::Tensor(tensor_shape), data(std::make_shared<ValueType[]>(this->total_element_count)) {
         strides.resize(this->rank);
         if (this->rank > 0) {
             strides[0] = 1;
@@ -56,8 +55,8 @@ class ContiguousTensor : public Tensor<ValueType> {
         }
 
         switch (init_code) {
-            case InitCode::NONE: {
-            } break;
+            case InitCode::NONE:
+                break;
             case InitCode::ZERO: {
                 for (size_t i = 0; i < this->total_element_count; i++) {
                     data.get()[i] = 0;
@@ -79,6 +78,15 @@ class ContiguousTensor : public Tensor<ValueType> {
             case InitCode::IOTA: {
                 for (size_t i = 0; i < this->total_element_count; i++) {
                     data.get()[i] = i;
+                }
+                break;
+            }
+            case InitCode::RAND: {
+                std::random_device rd;
+                std::mt19937 gen(rd());
+                std::uniform_real_distribution<> dis(min, max);
+                for (size_t i = 0; i < this->total_element_count; i++) {
+                    data.get()[i] = dis(gen);
                 }
                 break;
             }
