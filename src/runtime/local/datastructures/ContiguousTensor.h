@@ -72,8 +72,8 @@ class ContiguousTensor : public Tensor<ValueType> {
         }
 
         switch (init_code) {
-            case InitCode::NONE: {
-            } break;
+            case InitCode::NONE:
+                break;
             case InitCode::ZERO: {
                 for (size_t i = 0; i < this->total_element_count; i++) {
                     data.get()[i] = 0;
