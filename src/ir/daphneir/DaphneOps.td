@@ -623,6 +623,21 @@ def Daphne_SliceRowOp : Daphne_Op<"sliceRow", [
     let results = (outs MatrixOrFrame:$res);
 }
 
+def Daphne_SliceTensorOp : Daphne_Op<"sliceTensor", [
+    TypeFromFirstArg,
+    DeclareOpInterfaceMethods<InferShapeOpInterface>
+]> {
+    let summary = "Copies the specified rows from the argument to the result.";
+
+    let description = [{
+        Copies the rows of a data object `source` (matrix or frame) at the
+        positions in `[lowerIncl, upperExcl)` to the result.
+    }];
+
+    let arguments = (ins MatrixOrFrameOrTensor:$source, SI64:$lowerIncl, SI64:$upperExcl);
+    let results = (outs MatrixOrFrameOrTensor:$res);
+}
+
 def Daphne_ExtractColOp : Daphne_Op<"extractCol", [
     DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
     DeclareOpInterfaceMethods<InferTypesOpInterface>,

@@ -106,6 +106,44 @@ void DaphneDSLVisitor::handleAssignmentPart(mlir::Location loc,
         symbolTable.put(var, ScopedSymbolTable::SymbolInfo(val, false));
 }
 
+mlir::Value DaphneDSLVisitor::applyRightIndexingTensor(mlir::Location loc, mlir::Value arg, antlrcpp::Any ax) {
+    SPDLOG_LOGGER_DEBUG(logger, "applyRightIndexingTensor");
+    if(ax.is<mlir::Value>()) { // indexing with a single SSA value (no ':')
+        SPDLOG_LOGGER_DEBUG(logger, "indexing with a single SSA value (no ':')");
+        mlir::Value axVal = ax.as<mlir::Value>();
+        if (CompilerUtils::hasObjType(axVal)) {
+            throw ErrorHandler::compilerError(loc, "DSLVisitor (applyRightIndexingTensor)", "Not implemented yet");
+        } else {
+            // scalar
+            return utils.retValWithInferedType(
+                    builder.create<mlir::daphne::SliceTensorOp>(
+                            loc, utils.unknownType, arg,
+                            utils.castSI64If(axVal), utils.castSI64If(builder.create<mlir::daphne::EwAddOp>(loc, builder.getIntegerType(64, false),utils.castSI64If(axVal),builder.create<mlir::daphne::ConstantOp>(loc, static_cast<int64_t>(1)))
+                            )
+                    )
+            );
+            //throw ErrorHandler::compilerError(loc, "DSLVisitor (applyRightIndexingTensor)", "Not implemented yet1");
+        }
+            //return utils.retValWithInferedType(builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal));
+    }
+    // else if(ax.is<std::pair<mlir::Value, mlir::Value>>()) { // indexing with a range (':')
+    //     SPDLOG_LOGGER_DEBUG(logger, "indexing with a range (':')");
+    //     auto axPair = ax.as<std::pair<mlir::Value, mlir::Value>>();
+    //     auto axLowerIncl = axPair.first;
+    //     auto axUpperExcl = axPair.second;
+
+    //     // Use defaults if lower or upper bound not specified.
+    //     if(axLowerIncl == nullptr)
+    //         axLowerIncl = builder.create<mlir::daphne::ConstantOp>(loc, static_cast<int64_t>(0));
+    //     if(axUpperExcl == nullptr)
+    //         axUpperExcl = builder.create<NumAxOp>(loc, utils.sizeType, arg);
+
+    //     return utils.retValWithInferedType(builder.create<SliceAxOp>(loc, utils.unknownType, arg, utils.castSI64If(axLowerIncl), utils.castSI64If(axUpperExcl)));
+    // }
+    else
+        throw ErrorHandler::compilerError(loc, "DSLVisitor (applyRightIndexing)", "unsupported type for right indexing");
+}
+
 template<class ExtractAxOp, class SliceAxOp, class NumAxOp>
 mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value arg, antlrcpp::Any ax, bool allowLabel) {
     SPDLOG_LOGGER_DEBUG(logger, "applyRightIndexing");
@@ -126,15 +164,7 @@ mlir::Value DaphneDSLVisitor::applyRightIndexing(mlir::Location loc, mlir::Value
             return utils.retValWithInferedType(
                     builder.create<SliceAxOp>(
                             loc, utils.unknownType, arg,
-                            utils.castSI64If(axVal),
-                            utils.castSI64If(
-                                    builder.create<mlir::daphne::EwAddOp>(
-                                            loc, builder.getIntegerType(64, false),
-                                            utils.castSI64If(axVal),
-                                            builder.create<mlir::daphne::ConstantOp>(
-                                                    loc, static_cast<int64_t>(1)
-                                            )
-                                    )
+                            utils.castSI64If(axVal), utils.castSI64If(builder.create<mlir::daphne::EwAddOp>(loc, builder.getIntegerType(64, false),utils.castSI64If(axVal),builder.create<mlir::daphne::ConstantOp>(loc, static_cast<int64_t>(1)))
                             )
                     )
             );
@@ -1172,6 +1202,14 @@ antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser:
 
     auto indexing = visit(ctx->idx).as<std::vector<std::pair<bool, antlrcpp::Any>>>();
     SPDLOG_LOGGER_DEBUG(logger, "visitRightIdxExtractExpr: {}", indexing.size());
+
+    if (llvm::isa<mlir::daphne::TensorType>(obj.getType())) {
+        SPDLOG_LOGGER_DEBUG(logger, "Tensor!");
+        auto rows = indexing[0];
+        return applyRightIndexingTensor(utils.getLoc(ctx->idx->start), obj, rows.second);
+    } else if (llvm::isa<mlir::daphne::MatrixType>(obj.getType())) {
+        SPDLOG_LOGGER_DEBUG(logger, "Matrix!");
+    }
 
     // TODO Use location of rows/cols in utils.getLoc(...) for better error messages.
     // rows specified

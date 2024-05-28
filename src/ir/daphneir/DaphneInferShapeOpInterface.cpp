@@ -424,6 +424,24 @@ std::vector<std::vector<ssize_t>> daphne::SliceRowOp::inferShape() {
     return {{resNumRows, srcNumCols}};
 }
 
+std::vector<std::vector<ssize_t>> daphne::SliceTensorOp::inferShape() {
+    std::shared_ptr<spdlog::logger> logger = spdlog::get("compiler");
+    SPDLOG_LOGGER_DEBUG(logger, "daphne::SliceTensorOp::inferShape");
+    Type srcTy = getSource().getType();
+    if (auto srcTensTy = srcTy.dyn_cast<daphne::TensorType>()) {
+        SPDLOG_LOGGER_DEBUG(logger, "got tensor type");
+        auto shape = srcTensTy.getDims();
+        SPDLOG_LOGGER_DEBUG(logger, "dim: {}", shape[0]);
+        SPDLOG_LOGGER_DEBUG(logger, "dim: {}", shape[1]);
+        SPDLOG_LOGGER_DEBUG(logger, "dim: {}", shape[2]);
+        // for (const auto& e : shape[0]) {
+        //     SPDLOG_LOGGER_DEBUG(logger, "dim: {}",e);
+        // }
+    }
+    std::vector<std::vector<ssize_t>> shapes;
+    return shapes;
+}
+
 std::vector<std::vector<ssize_t>> daphne::SliceColOp::inferShape() {
     Type srcTy = getSource().getType();
     ssize_t srcNumRows;
