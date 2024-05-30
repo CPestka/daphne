@@ -3430,7 +3430,8 @@
             ]
         },
         "instantiations": [
-            [["ContiguousTensor", "float"], ["ContiguousTensor", "float"], "int64_t"]
+            [["ContiguousTensor", "float"], ["ContiguousTensor", "float"], "int64_t"],
+            [["ContiguousTensor", "double"], ["ContiguousTensor", "double"], "int64_t"]
         ]
     },
     {

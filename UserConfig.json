@@ -13,13 +13,13 @@
     "use_mlir_codegen": false,
     "vectorized_single_queue": false,
     "debug_llvm": false,
-    "explain_kernels": false,
-    "explain_llvm": false,
-    "explain_parsing": false,
-    "explain_parsing_simplified": false,
-    "explain_property_inference": false,
+    "explain_kernels": true,
+    "explain_llvm": true,
+    "explain_parsing": true,
+    "explain_parsing_simplified": true,
+    "explain_property_inference": true,
     "explain_sql": false,
-    "explain_type_adaptation": false,
+    "explain_type_adaptation": true,
     "explain_vectorized": false,
     "explain_obj_ref_mgnt": false,
     "explain_mlir_codegen": false,
@@ -30,7 +30,7 @@
     "daphnedsl_import_paths": {},
     "force_cuda": false,
     "logging": [
-        { "log-level-limit": "ERROR" },
+        { "log-level-limit": "DEBUG" },
         {
             "comment": "This configuration controls logging in the GPU compiler pass only",
             "name": "compiler::cuda",
@@ -48,23 +48,23 @@
         {
             "comment": "DAPHNE compiler logs",
             "name": "compiler",
-            "level": "INFO",
+            "level": "DEBUG",
             "filename": "",
-            "format": "%^[%n %L]:%$ %v"
+            "format": "%Y-%m-%d %H:%M:%S.%e [%s:%#] %^[%n %L]:%$ %v"
         },
         {
             "comment": "DAPHNE default",
             "name": "default",
-            "level": "INFO",
+            "level": "DEBUG",
             "filename": "",
             "format": "%^[%n %L]:%$ %v"
         },
         {
             "comment": "DAPHNE default",
             "name": "parser",
-            "level": "INFO",
+            "level": "DEBUG",
             "filename": "",
-            "format": "%^[%n %L]:%$ %v"
+            "format": "%Y-%m-%d %H:%M:%S.%e [%s:%#] %^[%n %L]:%$ %v"
         }
     ]
 }

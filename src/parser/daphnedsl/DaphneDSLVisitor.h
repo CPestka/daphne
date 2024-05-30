@@ -99,7 +99,7 @@ class DaphneDSLVisitor : public DaphneDSLGrammarVisitor {
     template<class ExtractAxOp, class SliceAxOp, class NumAxOp>
     mlir::Value applyRightIndexing(mlir::Location loc, mlir::Value arg, antlrcpp::Any ax, bool allowLabel);
 
-    mlir::Value applyRightIndexingTensor(mlir::Location loc, mlir::Value arg, antlrcpp::Any ax);
+    mlir::Value applyRightIndexingTensor(mlir::Location loc, mlir::Value arg, const std::vector<std::pair<bool, antlrcpp::Any>>& ranges);
     
     template<class InsertAxOp, class NumAxOp>
     mlir::Value applyLeftIndexing(mlir::Location loc, mlir::Value arg, mlir::Value ins, antlrcpp::Any ax, bool allowLabel);

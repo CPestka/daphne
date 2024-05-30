@@ -85,6 +85,7 @@ namespace
     struct RewriteSqlOpPass
     : public PassWrapper <RewriteSqlOpPass, OperationPass<ModuleOp>>
     {
+        MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(RewriteSqlOpPass)
         void runOnOperation() final;
 
     StringRef getArgument() const final { return "rewrite-sqlop"; }

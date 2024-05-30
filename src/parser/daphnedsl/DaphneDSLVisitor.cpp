@@ -106,8 +106,10 @@ void DaphneDSLVisitor::handleAssignmentPart(mlir::Location loc,
         symbolTable.put(var, ScopedSymbolTable::SymbolInfo(val, false));
 }
 
-mlir::Value DaphneDSLVisitor::applyRightIndexingTensor(mlir::Location loc, mlir::Value arg, antlrcpp::Any ax) {
-    SPDLOG_LOGGER_DEBUG(logger, "applyRightIndexingTensor");
+mlir::Value DaphneDSLVisitor::applyRightIndexingTensor(mlir::Location loc, mlir::Value arg, const std::vector<std::pair<bool, antlrcpp::Any>>& ranges) {
+    
+    auto ax = ranges[0].second;
+    SPDLOG_LOGGER_DEBUG(logger, "applyRightIndexingTensor: {}", ranges.size());
     if(ax.is<mlir::Value>()) { // indexing with a single SSA value (no ':')
         SPDLOG_LOGGER_DEBUG(logger, "indexing with a single SSA value (no ':')");
         mlir::Value axVal = ax.as<mlir::Value>();
@@ -122,9 +124,7 @@ mlir::Value DaphneDSLVisitor::applyRightIndexingTensor(mlir::Location loc, mlir:
                             )
                     )
             );
-            //throw ErrorHandler::compilerError(loc, "DSLVisitor (applyRightIndexingTensor)", "Not implemented yet1");
         }
-            //return utils.retValWithInferedType(builder.create<ExtractAxOp>(loc, utils.unknownType, arg, axVal));
     }
     // else if(ax.is<std::pair<mlir::Value, mlir::Value>>()) { // indexing with a range (':')
     //     SPDLOG_LOGGER_DEBUG(logger, "indexing with a range (':')");
@@ -1197,18 +1197,13 @@ antlrcpp::Any DaphneDSLVisitor::visitRightIdxFilterExpr(DaphneDSLGrammarParser::
 }
 
 antlrcpp::Any DaphneDSLVisitor::visitRightIdxExtractExpr(DaphneDSLGrammarParser::RightIdxExtractExprContext * ctx) {
-    SPDLOG_LOGGER_DEBUG(logger, "visitRightIdxExtractExpr");
     mlir::Value obj = utils.valueOrError(visit(ctx->obj));
 
     auto indexing = visit(ctx->idx).as<std::vector<std::pair<bool, antlrcpp::Any>>>();
     SPDLOG_LOGGER_DEBUG(logger, "visitRightIdxExtractExpr: {}", indexing.size());
 
     if (llvm::isa<mlir::daphne::TensorType>(obj.getType())) {
-        SPDLOG_LOGGER_DEBUG(logger, "Tensor!");
-        auto rows = indexing[0];
-        return applyRightIndexingTensor(utils.getLoc(ctx->idx->start), obj, rows.second);
-    } else if (llvm::isa<mlir::daphne::MatrixType>(obj.getType())) {
-        SPDLOG_LOGGER_DEBUG(logger, "Matrix!");
+        return applyRightIndexingTensor(utils.getLoc(ctx->idx->start), obj, indexing);
     }
 
     // TODO Use location of rows/cols in utils.getLoc(...) for better error messages.
