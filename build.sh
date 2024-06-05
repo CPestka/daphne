@@ -57,8 +57,11 @@ function printHelp {
     echo "  -y, --yes         Accept all prompts"
     echo "  --cuda            Compile with support for CUDA ops"
     echo "  --debug           Compile with support for debug mode"
+    echo "  --releaseDebug    Compile in release with debug info mode"
+    echo "  --san             Compile with all non thread sanitizers enabled"
+    echo "  --tsan            Compile with thread sanitizers enabled"
     echo "  --fpgaopencl      Compile with support for Intel PAC D5005 FPGA"
-    echo " --mpi             Compile with support for MPI"
+    echo "  --mpi             Compile with support for MPI"
 }
 
 #******************************************************************************
@@ -447,6 +450,7 @@ unknown_options=""
 BUILD_CUDA="-DUSE_CUDA=OFF"
 BUILD_FPGAOPENCL="-DUSE_FPGAOPENCL=OFF"
 BUILD_DEBUG="-DCMAKE_BUILD_TYPE=Release"
+BUILD_SAN=""
 BUILD_MPI="-DUSE_MPI=OFF"
 WITH_DEPS=1
 WITH_SUBMODULE_UPDATE=1
@@ -499,6 +503,18 @@ while [[ $# -gt 0 ]]; do
     --debug)
         echo building DEBUG version
         export BUILD_DEBUG="-DCMAKE_BUILD_TYPE=Debug"
+        ;;
+    --releaseDebug)
+        echo building Release version with debug info
+        export BUILD_DEBUG="-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+        ;;
+    --san)
+        echo building with all non-tsan sanitizers
+        export BUILD_SAN="-DCMAKE_CXX_FLAGS_SAN=ON"
+        ;;
+    --tsan)
+        echo building with tsan
+        export BUILD_SAN="-DCMAKE_CXX_FLAGS_T_SAN=ON"
         ;;
     --installPrefix)
         installPrefix=$1
@@ -1003,7 +1019,7 @@ daphne_msg "Build Daphne"
 
 cmake -S "$projectRoot" -B "$daphneBuildDir" -G Ninja -DANTLR_VERSION="$antlrVersion" \
     -DCMAKE_PREFIX_PATH="$installPrefix" \
-    $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI
+    $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI $BUILD_SAN
 
 cmake --build "$daphneBuildDir" --target "$target"
 
